@@ -1,13 +1,6 @@
 #include "integrator.h"
 
 
-Direction flip(Direction dir) {
-    if (dir == Major) {
-        return Minor;
-    }
-
-    return Major;
-}
 
 NumericalFieldIntegrator::NumericalFieldIntegrator(
         TensorField* field) : field_(field) {}

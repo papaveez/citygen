@@ -1,7 +1,7 @@
 #ifndef CONST_H
 #define CONST_H
 
-// #define SPATIAL_TEST
+// #define STORAGE_TEST 
 
 #include "types.h"
 

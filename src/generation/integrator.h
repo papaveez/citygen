@@ -5,12 +5,12 @@
 #include "tensor_field.h"
 
 
-enum Direction : char {
-    Minor = 1 << 0,
-    Major = 1 << 1
+enum Direction : size_t {
+    Minor,
+    Major,
+    EigenfieldCount
 };
 
-Direction flip(Direction dir);
 
 class NumericalFieldIntegrator {
 private:

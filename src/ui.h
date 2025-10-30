@@ -3,11 +3,13 @@
 
 #include <cassert>
 
+#include "generation/road_storage.h"
 #include "raylib.h"
 #include "raygui.h"
 
 #include "generation/tensor_field.h"
 #include "generation/generator.h"
+
 #include "const.h"
 
 struct RenderContext {
@@ -29,36 +31,38 @@ static constexpr struct {
     float modalHeight = 90.0f;
 } uiConfig;
 
+
 struct RoadStyle {
     Color colour;
     Color outline_colour;
     float width;
     float outline_width;
 
-    static RoadStyle default_roadstyle(RoadType t) {
-        switch (t) {
-            case Main:
-                return {
-                    {250, 224, 98, 255},
-                    {238, 199, 132, 255},
-                    10.0f,
-                    2.0f
-                };
-            case HighStreet:
-                return {
-                    {252,252,224, 255},
-                    {240,210,152, 255},
-                    8.0f,
-                    2.0f
-                };
-            case SideStreet:
-                return {
-                    {255,255,255, 255},
-                    {215, 208, 198},
-                    6.0f,
-                    1.0f
-                };
-        }
+    static RoadStyle default_main() {
+        return {
+            {250, 224, 98, 255},
+            {238, 199, 132, 255},
+            10.0f,
+            2.0f
+        };
+    }
+
+    static RoadStyle default_highstreet() {
+        return {
+            {252,252,224, 255},
+            {240,210,152, 255},
+            8.0f,
+            2.0f
+        };
+    }
+
+    static RoadStyle default_sidestreet() {
+        return {
+            {255,255,255, 255},
+            {215, 208, 198},
+            6.0f,
+            1.0f
+        };
     }
 };
 
@@ -73,14 +77,13 @@ enum Tool: int {
     GridBrush,
     RadialBrush,
     GenerateMap,
-    StepGen,
     BackToEditor,
     Regenerate,
     ToolCount
 };
 
 
-static std::list<Tool> fieldEditorTools{GridBrush, RadialBrush, GenerateMap, StepGen};
+static std::list<Tool> fieldEditorTools{GridBrush, RadialBrush, GenerateMap};
 static std::list<Tool> mapTools{BackToEditor, Regenerate};
 
 
@@ -88,7 +91,6 @@ static constexpr int toolIcons[ToolCount] = {
     ICON_BOX_GRID,
     ICON_GEAR_EX,
     ICON_PLAYER_PLAY,
-    ICON_PLAYER_NEXT,
     ICON_UNDO_FILL,
     ICON_RESTART
 };
@@ -111,18 +113,11 @@ private:
     RoadGenerator* generator_ptr_;
 
     std::unordered_map<RoadType, RoadStyle> road_styles_ = {
-        {Main, RoadStyle::default_roadstyle(Main)},
-        {HighStreet, RoadStyle::default_roadstyle(HighStreet)},
-        {SideStreet, RoadStyle::default_roadstyle(SideStreet)}
+        {Main, RoadStyle::default_main()},
+        {HighStreet, RoadStyle::default_highstreet()},
+        {SideStreet, RoadStyle::default_sidestreet()}
     };
 
-    Direction dir_ = Major;
-    #ifdef SPATIAL_TEST
-    std::list<DVector2> points_;
-
-    void test_spatial();
-    void test_draw_spatial(qnode_id head_ptr);
-    #endif
 
     UIMode mode_ = FieldEditor;
     Tool brush_ = GridBrush;
@@ -134,6 +129,7 @@ private:
     bool step_mode_ = false;
     int road_idx_ = 0;
 
+
     bool mouse_in_viewport();
     
     void draw_vector_line(const Vector2& vec, const Vector2& world_pos, Color col) const;
@@ -141,7 +137,7 @@ private:
 
     void render_generating_popup() const;
 
-    void draw_streamlines(RoadType road, Direction dir) const;
+    void draw_streamlines(RoadType road, Eigenfield ef) const;
     void render_map();
 
     void editor();
@@ -150,6 +146,14 @@ private:
     void render_hud();
     void handle_tool_click(const Tool&);
     void reset_field_editor();
+
+    #ifdef STORAGE_TEST 
+    std::list<DVector2> points_;
+
+    void test_spatial();
+    void test_draw_spatial(qnode_id head_ptr);
+    #endif
+
 
 
 public:

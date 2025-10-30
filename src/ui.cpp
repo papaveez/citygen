@@ -1,11 +1,16 @@
 #include "ui.h"
 
+#include <cstdint>
 #include <limits>
 
+#include "generation/integrator.h"
+#include "generation/road_storage.h"
 #include "raylib.h"
 #include "raygui.h"
 #include "raymath.h"
+#include "types.h"
 
+// #define DRAW_NODES
 
 static constexpr float f_epsilon = std::numeric_limits<float>::epsilon();
 
@@ -128,167 +133,54 @@ void Renderer::handle_brush_release() {
 
         tf_ptr_->add_basis_field(std::make_unique<Radial>(
             radial_edit_.centre,
-            rad,
+rad,
             radial_edit_.decay
         ));
     }
 }
 
 
-#ifdef SPATIAL_TEST
-void Renderer::test_spatial() {
-    assert(ctx_.is_drawing);
-    assert(ctx_.is_2d_mode);
+void Renderer::draw_streamlines(RoadType road_type, Eigenfield ef) const {
+    // const std::vector<Streamline>& sls = generator_ptr_->get_streamlines(road, dir);
 
-    if (IsKeyDown(KEY_SPACE)) {
-        Color col = BLACK;
+    const RoadStyle& style = road_styles_.at(road_type);
 
-        std::list<node_id> majors = 
-            generator_ptr_->spatial_.nearby_points(ctx_.mouse_world_pos, 100, Major);
-        
-        std::list<node_id> minors =
-            generator_ptr_->spatial_.nearby_points(ctx_.mouse_world_pos, 100, Minor);
+    std::uint32_t num_roads = generator_ptr_->road_count(road_type, ef);
 
-        int a = majors.size();
-        int b = minors.size();
-        if (a && b ) {
-            col = GREEN;
-        } else if (a) {
-            col = RED;
-        } else if (b) {
-            col= BLUE;
-        }
-
-        DrawCircleLinesV(ctx_.mouse_world_pos, 100, col);
-
-        DrawTextEx(GetFontDefault(), TextFormat("[%i, %i]", a, b),
-                ctx_.mouse_world_pos+DVector2{ -44, -24 }, 20, 2, BLACK);
-    }
-
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-        if (points_.size()) {
-            if (points_.size() > 1) {
-                int n = points_.size();
-                Vector2* pts = new Vector2[n];
-
-                int i = 0;
-                for (const DVector2& v : points_) {
-                    pts[i] = v;
-                    ++i;
-                }
-
-                DrawSplineLinear(pts, n, 3.0f, dir_== Major ? RED : BLUE);
-            }
-
-            DVector2 diff = points_.back() - ctx_.mouse_world_pos;
-            if (dot_product(diff, diff) < 1000.0) return;
-        }
-
-        points_.push_back(ctx_.mouse_world_pos);
-
-        
-    } else if (points_.size()) {
-        generator_ptr_->push_streamline(Main, points_, dir_);
-
-        points_ = {};
-    } else if (IsKeyPressed(KEY_D)) {
-        dir_ = flip(dir_);
-    }
-}
-
-void Renderer::test_draw_spatial(qnode_id head_ptr) {
-    auto& s = generator_ptr_->spatial_;
-
-    if (head_ptr == QNullNode) return;
-    QuadNode node = s.qnodes_[head_ptr];
-
-    Box<double> bbox = node.bbox;
-    Vector2 pos = bbox.min;
-
-    Color col = BLACK;
-
-    if (node.dirs & Major && node.dirs & Minor) {
-        col = GREEN;
-    } else if (node.dirs & Major) {
-        col = RED;
-    } else if (node.dirs & Minor) {
-        col = BLUE;
-    }
-    Vector2 dims = bbox.max - bbox.min;
-
-    Rectangle rect = {pos.x, pos.y, dims.x, dims.y};
-
-    DrawRectangleLinesEx(rect, 2.0f, col);
-
-    if (s.is_leaf(head_ptr)) {
-        for (auto id: node.data) {
-            std::optional<StreamlineNode> n = generator_ptr_->get_node(id);
-            assert(n);
-            DrawCircleV(n.value().pos, 1.0, n.value().dir == Major ? RED : BLUE);
-        }
-    }
-    else {
-        for (auto q : {TopLeft, TopRight, BottomLeft, BottomRight}) {
-            test_draw_spatial(node.children[q]);
-        }
-    }
-}
-#endif
-
-void Renderer::draw_streamlines(RoadType road, Direction dir) const {
-    const std::vector<Streamline>& sls = generator_ptr_->get_streamlines(road, dir);
-
-    const RoadStyle& style = road_styles_.at(road);
-
-    for (const Streamline& sl : sls) {
-        assert(sl.size() > 1);
-
-        int extra_edge = 0; // to join circles
-
-        if (sl.front() == sl.back()) {
-            assert(sl.size() > 2);
-            extra_edge = 1;
-
-        }
+    for (std::uint32_t idx=0; idx<num_roads; ++idx) {
+        RoadHandle handle = {
+            idx,
+            road_type,
+            ef
+        };
 
 
-        Vector2* positions = new Vector2[sl.size() + extra_edge];
-
-        int i = 0;
-        for (const node_id& id: sl) {
-            std::optional<StreamlineNode> maybe_node = generator_ptr_->get_node(id);
-            assert(maybe_node);
-            positions[i] = maybe_node.value().pos;
-            i++;
-        }
-
-        if (extra_edge) {
-            positions[sl.size()] = positions[0];
-        }
+        auto [len, data] = generator_ptr_->get_road_points(handle);
 
         DrawSplineLinear(
-            positions, 
-            sl.size() + extra_edge, 
+            data, 
+            len,
             style.outline_width+style.width,
             style.outline_colour
         );
 
         DrawSplineLinear(
-            positions,
-            sl.size() + extra_edge,
+            data,
+            len,
             style.width,
             style.colour
         );
 
-        Color col = dir == Major ? RED : BLUE;
-        for (int i=0; i < sl.size() + extra_edge; ++i) {
-            DrawCircleV(positions[i], 1, col);
+#ifdef DRAW_NODES
+        Color col = ef == Major ? RED : BLUE;
+        for (int i=0; i < len; ++i) {
+            DrawCircleV(data[i], 1, col);
             if (i>0) {
-                DrawLineV(positions[i-1], positions[i], col);
+                DrawLineV(data[i-1], data[i], col);
             }
         }
-        
-        delete[] positions;
+#endif
+
     }
 
 }
@@ -298,21 +190,11 @@ void Renderer::render_map() {
     assert(ctx_.is_2d_mode);
 
     if (!generated_) {
-        generator_ptr_->set_viewport(ctx_.viewport);
-    }
-    if (!generated_ && !step_mode_) {
+        generator_ptr_->reset(ctx_.viewport);
         generator_ptr_->generate();
         generated_ = true;
-
-    } else if (step_mode_ && IsKeyPressed(KEY_SPACE)) {
-        generated_ = true;
-        if (generator_ptr_->generation_step(generator_ptr_->get_road_types()[road_idx_], dir_)) {
-            dir_ = flip(dir_);
-        }
-        else if (road_idx_ < generator_ptr_->get_road_types().size()-1) {
-            road_idx_ += 1;
-        }
     }
+
 
     const std::vector<RoadType>& road_types = generator_ptr_->get_road_types();
     for (int i=road_types.size()-1; i>=0; --i) {
@@ -391,9 +273,6 @@ void Renderer::handle_tool_click(const Tool& t) {
         step_mode_ = false;
         mode_ = Map;
         will_generate = !generated_;
-    } else if (t == StepGen) {
-        step_mode_ = true;
-        mode_ = Map;
     } else if (t == BackToEditor) {
         step_mode_ = false;
         generated_ = false;
@@ -430,22 +309,128 @@ Renderer::Renderer(
 }
 
 
+
+#ifdef STORAGE_TEST 
+void Renderer::test_spatial() {
+    assert(ctx_.is_drawing);
+    assert(ctx_.is_2d_mode);
+
+    if (IsKeyDown(KEY_SPACE)) {
+        Color col = BLACK;
+
+        std::list<NodeHandle> majors = 
+            generator_ptr_->nearby_points(ctx_.mouse_world_pos, 100, Eigenfield(Major));
+        
+        std::list<NodeHandle> minors =
+            generator_ptr_->nearby_points(ctx_.mouse_world_pos, 100, Eigenfield(Minor));
+
+
+
+        int a = majors.size();
+        int b = minors.size();
+        if (a && b ) {
+            col = GREEN;
+        } else if (a) {
+            col = RED;
+        } else if (b) {
+            col= BLUE;
+        }
+
+        DrawCircleLinesV(ctx_.mouse_world_pos, 100, col);
+
+        DrawTextEx(GetFontDefault(), TextFormat("[%i, %i]", a, b),
+                ctx_.mouse_world_pos+DVector2{ -44, -24 }, 20, 2, BLACK);
+    }
+
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        if (points_.size()) {
+            if (points_.size() > 1) {
+                int n = points_.size();
+                Vector2* pts = new Vector2[n];
+
+                int i = 0;
+                for (const DVector2& v : points_) {
+                    pts[i] = v;
+                    ++i;
+                }
+
+                DrawSplineLinear(pts, n, 3.0f, dir_== Major ? RED : BLUE);
+            }
+
+            DVector2 diff = points_.back() - ctx_.mouse_world_pos;
+            if (dot_product(diff, diff) < 1000.0) return;
+        }
+
+        points_.push_back(ctx_.mouse_world_pos);
+
+        
+    } else if (points_.size()) {
+        generator_ptr_->push_road(points_, Main, dir_);
+        points_ = {};
+    } else if (IsKeyPressed(KEY_D)) {
+        dir_ = flip(dir_);
+    }
+}
+
+void Renderer::test_draw_spatial(qnode_id head_ptr) {
+    if (head_ptr == NullQNode) return;
+
+    QuadNode node = generator_ptr_->qnodes_[head_ptr];
+
+    Box<double> bbox = node.bbox;
+    Vector2 pos = bbox.min;
+
+    Color col = BLACK;
+
+    ef_mask maj = Eigenfield(Major).mask();
+    ef_mask min = Eigenfield(Minor).mask();
+
+
+    if (node.eigenfields & maj && node.eigenfields & min) {
+        col = GREEN;
+    } else if (node.eigenfields & maj) {
+        col = RED;
+    } else if (node.eigenfields & min) {
+        col = BLUE;
+    }
+
+    Vector2 dims = bbox.max - bbox.min;
+
+    Rectangle rect = {pos.x, pos.y, dims.x, dims.y};
+
+    DrawRectangleLinesEx(rect, 2.0f, col);
+
+    if (generator_ptr_->is_leaf(head_ptr)) {
+        for (const NodeHandle& hd: node.data) {
+            DVector2 pos = generator_ptr_->get_pos(hd);
+            Eigenfield ef = hd.road_handle.eigenfield;
+
+            DrawCircleV(pos, 1.0, ef == Major ? RED : BLUE);
+        }
+    }
+    else {
+        for (auto q : {TopLeft, TopRight, BottomLeft, BottomRight}) {
+            test_draw_spatial(node.children[q]);
+        }
+    }
+}
+#endif
+
 void Renderer::main_loop() {
     assert(ctx_.is_drawing);
 
     
     ClearBackground(RAYWHITE);
-    #ifdef SPATIAL_TEST
+    #ifdef STORAGE_TEST 
         BeginMode2D(ctx_.camera); ctx_.is_2d_mode = true; {
             test_spatial();
-            test_draw_spatial(generator_ptr_->spatial_.root_);
+            test_draw_spatial(generator_ptr_->root_);
         } EndMode2D(); ctx_.is_2d_mode = false;
         // draw current dir
         
         auto text = dir_ == Major ? "MAJOR" : "MINOR";
         Color col = dir_ == Major ? RED : BLUE;
         DrawText(text, ctx_.width-200, 10, 30, col);
-
     #else
     if (mode_ == FieldEditor) render_tensorfield();
     BeginMode2D(ctx_.camera); ctx_.is_2d_mode = true; {

@@ -154,8 +154,8 @@ struct Box {
         return max.y - min.y;
     }
 
-    std::tuple<Box, Box, Box, Box> // TL TR BL BR
-    quadrants() {
+    std::array<Box, 4> // TL TR BL BR
+    quadrants() const {
         TVector2<T> mid = middle(min, max);
 
         return {

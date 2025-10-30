@@ -1,6 +1,6 @@
 #include "generator.h"
 #include "integrator.h"
-#include "node_storage.h"
+// #include "node_storage.h"
 
 #include <cassert>
 #include <iostream>
@@ -44,21 +44,20 @@ bool RoadGenerator::in_bounds(const DVector2& p) const {
 }
 
 
-void RoadGenerator::add_candidate_seed(node_id id, Direction dir) {
-    DVector2 seed = nodes_[id].pos;
-    seeds_[dir].push(seed);
+void RoadGenerator::add_candidate_seed(DVector2 pos, Eigenfield ef) {
+    seeds_[ef].push(pos);
 }
 
 
 std::optional<DVector2> 
-RoadGenerator::get_seed(RoadType road, Direction dir) {
-    seed_queue& candidate_queue = seeds_[dir];
+RoadGenerator::get_seed(RoadType road, Eigenfield ef) {
+    seed_queue& candidate_queue = seeds_[ef];
 
     DVector2 seed;
     while (!candidate_queue.empty()) {
         DVector2 seed = candidate_queue.front();
         candidate_queue.pop();
-        if (!spatial_.has_nearby_point(seed, params_.at(road).d_sep, dir)) {
+        if (!has_nearby_point(seed, params_.at(road).d_sep, ef)) {
             return seed;
         } 
     }
@@ -71,7 +70,7 @@ RoadGenerator::get_seed(RoadType road, Direction dir) {
         };
 
 
-        if (!spatial_.has_nearby_point(seed, params_.at(road).d_sep, dir)) {
+        if (!has_nearby_point(seed, params_.at(road).d_sep, ef)) {
             return seed;
         } 
     }
@@ -79,10 +78,10 @@ RoadGenerator::get_seed(RoadType road, Direction dir) {
 }
 
 
-void RoadGenerator::extend_streamline(
+void RoadGenerator::extend_road(
     Integration& res,
     const RoadType& road, 
-    const Direction& dir
+    const Eigenfield& ef 
 ) const {
     if (res.status != Continue) {
         res.status = Abort;
@@ -91,7 +90,7 @@ void RoadGenerator::extend_streamline(
 
     DVector2 delta = integrator_->integrate(
         res.integration_front, 
-        dir, 
+        ef, 
         params_.at(road).dl
     );
 
@@ -115,14 +114,14 @@ void RoadGenerator::extend_streamline(
     }
 
     res.status = Continue;
-    if (spatial_.has_nearby_point(res.integration_front, params_.at(road).d_test, dir)) {
+    if (has_nearby_point(res.integration_front, params_.at(road).d_test, ef)) {
         res.status = Terminate;
     }
 }
 
 
 std::optional<std::list<DVector2>>
-RoadGenerator::generate_streamline(RoadType road, DVector2 seed_point, Direction dir) {
+RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) {
     Integration forward  (seed_point, false);
     Integration backward (seed_point, true );
 
@@ -133,8 +132,8 @@ RoadGenerator::generate_streamline(RoadType road, DVector2 seed_point, Direction
     int count = 0;
 
     while(count<params_.at(road).max_integration_iterations) {
-        extend_streamline(forward,  road, dir);
-        extend_streamline(backward, road, dir);
+        extend_road(forward,  road, ef);
+        extend_road(backward, road, ef);
 
         if (backward.status == Abort && forward.status == Abort)
             break;
@@ -172,43 +171,44 @@ RoadGenerator::generate_streamline(RoadType road, DVector2 seed_point, Direction
     result.splice(result.end(), backward.points);
     result.splice(result.end(), forward.points);
 
-    if (result.size() < 5) return {};
+    if (result.size() < min_streamline_size_) return {};
 
     return result;
 }
 
 
-int RoadGenerator::generate_streamlines(RoadType road) {
-    Direction dir = Major;
+int RoadGenerator::generate_all_roads(RoadType road_type) {
+    Eigenfield ef(Major);
 
-    std::optional<DVector2> seed = get_seed(road, dir);
+    std::optional<DVector2> seed = get_seed(road_type, ef);
     int k = 0;
     while (seed.has_value()) {
         std::optional<std::list<DVector2>> new_streamline
-            = generate_streamline(road, seed.value(), dir);
+            = generate_road(road_type, seed.value(), ef);
 
         if (new_streamline.has_value()) {
-            simplify_streamline(road, new_streamline.value());
+            simplify_road(road_type, new_streamline.value());
 
             if (new_streamline.value().size() >= min_streamline_size_) {
-                push_streamline(road, new_streamline.value(), dir);
+                push_road(new_streamline.value(), road_type, ef);
                 k += 1;
-                dir = flip(dir);
+                ef = flip(ef);
             }
         }
         
-        seed = get_seed(road, dir);
+        seed = get_seed(road_type, ef);
     };
 
+    std::cout << "generated " << k << " roads" << std::endl;
 
-    connect_roads(road, Major);
-    connect_roads(road, Minor);
+    // connect_roads(road, Major);
+    // connect_roads(road, Minor);
 
     return k;
 }
 
 
-void RoadGenerator::simplify_streamline(RoadType road, std::list<DVector2>& points) const {
+void RoadGenerator::simplify_road(RoadType road, std::list<DVector2>& points) const {
     assert(params_.at(road).epsilon > 0.0);
     douglas_peucker(params_.at(road).epsilon, params_.at(road).node_sep2, points, points.begin(), points.end());
 }
@@ -260,123 +260,110 @@ void RoadGenerator::douglas_peucker(const double& epsilon, const double& min_sep
 }
 
 
-void RoadGenerator::push_streamline(RoadType road, std::list<DVector2>& points, Direction dir) {
-    int new_streamline_id = streamlines_[road].size(dir);
-    int new_node_id = node_count();
-    Streamline out;
-    for (const DVector2& vec : points) {
-        nodes_.push_back(StreamlineNode{
-            vec,
-            new_streamline_id,
-            dir
-        });
-        out.push_back(new_node_id);
-        ++new_node_id;
+void RoadGenerator::push_road(std::list<DVector2>& points, RoadType road, Eigenfield ef) {
+    if (points.front() != points.back()) {
+        add_candidate_seed(points.front(), flip(ef));
+        add_candidate_seed(points.back(), flip(ef));
     }
 
-    spatial_.insert_streamline(out, dir);
-   
-    if (out.front() != out.back()) {
-        add_candidate_seed(out.front(), flip(dir));
-        add_candidate_seed(out.back(), flip(dir));
-    }
-
-    streamlines_[road].add(out, dir);
+    insert(points, road, ef);
 }
 
 // standard joining candidate algorithm
-std::optional<node_id>
-RoadGenerator::joining_candidate(const double& rad, const double& max_node_sep2, const double& theta_max, 
-    const DVector2& pos, const DVector2& road_direction, const std::unordered_set<node_id>& forbidden) const 
-{
-    std::list<node_id> nearby = 
-        spatial_.nearby_points(pos, rad, Major | Minor);
+// std::optional<NodeHandle>
+// RoadGenerator::joining_candidate(const double& rad, const double& max_node_sep2, const double& theta_max, 
+//     const DVector2& pos, const DVector2& road_direction, const std::unordered_set<NodeHandle>& forbidden) const 
+// {
+//     std::list<NodeHandle> nearby = 
+//         storage_.nearby_points(pos, rad, Major | Minor);
+//
+//     std::optional<NodeHandle> best_node;
+//
+//     double min_dist2 = std::numeric_limits<double>::infinity();
+//
+//     for (const NodeHandle& candidate_handle: nearby) {
+//
+//         if (forbidden.contains(candidate_handle)) continue;
+//
+//         DVector2 join_vector = storage_.get_pos(candidate_handle);
+//
+//         if (dot_product(join_vector, road_direction) < 0) continue; // opposite directions.
+//
+//         double d2 = dot_product(join_vector, join_vector);
+//
+//         if (d2 < max_node_sep2)
+//             return candidate_handle;
+//
+//
+//         double theta = std::abs(vector_angle(road_direction, join_vector));
+//
+//         if (theta < theta_max && d2 < min_dist2) {
+//             min_dist2 = d2;
+//             best_node = candidate_handle;
+//         }
+//     }
+//
+//     return best_node;
+// }
 
-    std::optional<node_id> best_node;
-    double min_dist2 = std::numeric_limits<double>::infinity();
-
-    for (const node_id& candidate_id : nearby) {
-        if (forbidden.contains(candidate_id)) continue;
-
-        DVector2 join_vector = nodes_[candidate_id].pos-pos;
-        
-        if (dot_product(join_vector, road_direction) < 0) continue; // opposite directions.
-
-        double d2 = dot_product(join_vector, join_vector);
-
-        if (d2 < max_node_sep2)
-            return candidate_id;
-
-
-        double theta = std::abs(vector_angle(road_direction, join_vector));
-
-        if (theta < theta_max && d2 < min_dist2) {
-            min_dist2 = d2;
-            best_node = candidate_id;
-        }
-    }
-
-    return best_node;
-}
-
-void RoadGenerator::connect_roads(RoadType road, Direction dir) {
-    int k = 0;
-    for (Streamline& s : streamlines_[road].get_streamlines(dir)) {
-        if (s.front() == s.back()) continue; // ignore circles
-        
-        DVector2 front_pos = nodes_[s.front()].pos;
-        DVector2 back_pos = nodes_[s.back()].pos;
-
-        std::unordered_set<node_id> front_forbidden;
-        std::unordered_set<node_id> back_forbidden;
-
-
-        // first min_streamline_size_ nodes
-        Streamline::iterator last_front_forbidden = std::next(s.begin(), min_streamline_size_-1);
-        for (auto it = s.begin(); it != last_front_forbidden; ++it) {
-            front_forbidden.insert(*it);
-        }
-
-        // DVector2 front_direction = front_pos - nodes_[*std::prev(last_forbidden)].pos;
-        DVector2 front_direction = front_pos - nodes_[*last_front_forbidden].pos;
-        
-
-
-        Streamline::iterator last_back_forbidden = std::prev(s.end(), min_streamline_size_);
-        for (auto it = std::prev(s.end()); it != last_back_forbidden; ++it) {
-            back_forbidden.insert(*it);
-        }
-
-
-        DVector2 back_direction = back_pos - nodes_[*last_back_forbidden].pos;
+// void RoadGenerator::connect_roads(RoadType road, Eigenfield dir) {
+//     int k = 0;
+//     for (Streamline& s : streamlines_[road].get_streamlines(dir)) {
+//         if (s.front() == s.back()) continue; // ignore circles
+//
+//         DVector2 front_pos = nodes_[s.front()].pos;
+//         DVector2 back_pos = nodes_[s.back()].pos;
+//
+//         std::unordered_set<node_id> front_forbidden;
+//         std::unordered_set<node_id> back_forbidden;
+//
+//
+//         // first min_streamline_size_ nodes
+//         Streamline::iterator last_front_forbidden = std::next(s.begin(), min_streamline_size_-1);
+//         for (auto it = s.begin(); it != last_front_forbidden; ++it) {
+//             front_forbidden.insert(*it);
+//         }
+//
+//         // DVector2 front_direction = front_pos - nodes_[*std::prev(last_forbidden)].pos;
+//         DVector2 front_direction = front_pos - nodes_[*last_front_forbidden].pos;
+//
+//
+//
+//         Streamline::iterator last_back_forbidden = std::prev(s.end(), min_streamline_size_);
+//         for (auto it = std::prev(s.end()); it != last_back_forbidden; ++it) {
+//             back_forbidden.insert(*it);
+//         }
+//
+//
+//         DVector2 back_direction = back_pos - nodes_[*last_back_forbidden].pos;
+//
+//
+//         std::optional<node_id> front_join 
+//             = joining_candidate(params_.at(road).d_lookahead, params_.at(road).node_sep2, params_.at(road).theta_max,
+//                     front_pos, front_direction, front_forbidden);    
+//         std::optional<node_id> back_join
+//             = joining_candidate(params_.at(road).d_lookahead, params_.at(road).node_sep2, params_.at(road).theta_max,
+//                     back_pos, back_direction, back_forbidden);
+//
+//         if (front_join.has_value()) {
+//             // connect(s, s.front(), front_join.value());
+//             s.push_front(front_join.value());
+//             ++k;
+//         }
+//
+//         if (back_join.has_value()) {
+//             // connect(s, s.back(), back_join.value());
+//             s.push_back(back_join.value());
+//             ++k;
+//         }
+//
+//     }
+//
+//     std::cout << "Connected " << k << " roads" <<std::endl;
+// }
 
 
-        std::optional<node_id> front_join 
-            = joining_candidate(params_.at(road).d_lookahead, params_.at(road).node_sep2, params_.at(road).theta_max,
-                    front_pos, front_direction, front_forbidden);    
-        std::optional<node_id> back_join
-            = joining_candidate(params_.at(road).d_lookahead, params_.at(road).node_sep2, params_.at(road).theta_max,
-                    back_pos, back_direction, back_forbidden);
-
-        if (front_join.has_value()) {
-            // connect(s, s.front(), front_join.value());
-            s.push_front(front_join.value());
-            ++k;
-        }
-
-        if (back_join.has_value()) {
-            // connect(s, s.back(), back_join.value());
-            s.push_back(back_join.value());
-            ++k;
-        }
-
-    }
-
-    std::cout << "Connected " << k << " roads" <<std::endl;
-}
-
-
-// void RoadGenerator::add_intersections(RoadType road, Direction dir, Streamline& s) {
+// void RoadGenerator::add_intersections(RoadType road, Eigenfield dir, Streamline& s) {
 //     const double& sep = params_.at(road).node_sep;
 //
 //     for (auto it = s.begin(); it != s.end(); ++it) {
@@ -395,21 +382,17 @@ void RoadGenerator::connect_roads(RoadType road, Direction dir) {
 
 
 RoadGenerator::RoadGenerator(
-        std::unique_ptr<NumericalFieldIntegrator>& integrator,
-        std::unordered_map<RoadType, GeneratorParameters> parameters,
-        Box<double> viewport
-        ) :
+    std::unique_ptr<NumericalFieldIntegrator>& integrator,
+    std::unordered_map<RoadType, GeneratorParameters> parameters,
+    Box<double> viewport
+) :
     viewport_(viewport),
     integrator_(std::move(integrator)),
-    nodes_(std::vector<StreamlineNode>{}),
     params_(parameters),
     dist_(0.0, 1.0),
-    spatial_(Spatial(&nodes_, viewport_, kQuadTreeDepth, kQuadTreeLeafCapacity))
+    RoadStorage(viewport, kQuadTreeDepth, kQuadTreeLeafCapacity)
 {
     road_types_.reserve(parameters.size());
-    streamlines_.reserve(parameters.size());
-    seeds_.reserve(2); // major, minor
-    
 
     for (auto& [key, params] : params_) {
         params.d_test = std::min(params.d_test, params.d_sep);
@@ -430,82 +413,29 @@ RoadGenerator::get_parameters() const {
 }
 
 
-const StreamlineNode&
-RoadGenerator::get_node(node_id i) const {
-    assert(0 <= i && i < nodes_.size());
-    return nodes_[i];
+
+
+void RoadGenerator::reset(Box<double> new_viewport) {
+    viewport_ = new_viewport;
+    clear();
 }
 
 
-const std::vector<Streamline>& 
-RoadGenerator::get_streamlines(RoadType road, Direction dir) {
-    return streamlines_[road].get_streamlines(dir);
-}
-
-
-int RoadGenerator::node_count() const {
-    return nodes_.size();
-}
-
-
-int RoadGenerator::streamline_count() const {
-    int count;
-    for (const RoadType& road : road_types_) {
-        if (!streamlines_.contains(road)) continue;
-        count += streamlines_.at(road).size(Major);
-        count += streamlines_.at(road).size(Minor);
-    }
-    return count;
-}
-
-
-void RoadGenerator::set_viewport(Box<double> new_viewport) {
-    viewport_ = std::move(new_viewport);
-}
-
-
-bool RoadGenerator::generation_step(RoadType road, Direction dir) {
-    std::optional<DVector2> seed = get_seed(road, dir);
-    if (!seed.has_value()) {
-        return false;
+void RoadGenerator::clear() {
+    for (int i=0; i<EigenfieldCount;++i) {
+        seeds_[i] = {};
     }
 
-
-    std::optional<std::list<DVector2>> new_streamline
-        = generate_streamline(road, seed.value(), dir);
-
-    if (!new_streamline.has_value()) {
-        return false;
-    }
-
-    push_streamline(road, new_streamline.value(), dir);
-    return true;
+    reset_storage(viewport_);
 }
 
 
 void RoadGenerator::generate() {
     clear();
 
-    spatial_.reset(viewport_);
-
     std::sort(road_types_.begin(), road_types_.end());
 
     for (auto r : road_types_) {
-        generate_streamlines(r);
+        generate_all_roads(r);
     }
-
-    std::cout << "node count: " << node_count() << std::endl;
-    std::cout << "streamline count: " << streamline_count() << std::endl;
-}
-
-
-void RoadGenerator::clear() {
-    // empty everything
-    seeds_.clear();
-    seeds_.reserve(2);
-
-    nodes_.clear();
-
-    streamlines_.clear();
-    spatial_.clear();
 }
