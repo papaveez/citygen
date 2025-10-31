@@ -149,7 +149,7 @@ public:
         partition(const Box<double>& bbox, std::list<NodeHandle>& s);
 
     bool is_leaf(const qnode_id& id) const;
-    void subdivide(const qnode_id& head_ptr);
+
     void append_leaf_data(
         const qnode_id& leaf_ptr,
         const ef_mask& eigenfields,
@@ -157,7 +157,7 @@ public:
     );
 
     void insert_rec(
-        int depth, 
+        const int& depth, 
         const qnode_id& head_ptr,
         const ef_mask& dirs,
         std::list<NodeHandle>& list
@@ -169,6 +169,11 @@ public:
     ) const;
 
     bool in_bbox_rec(
+        const qnode_id& head_ptr,
+        BBoxQuery& query
+    ) const;
+
+    bool gather_data_rec(
         const qnode_id& head_ptr,
         BBoxQuery& query
     ) const;

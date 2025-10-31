@@ -1,11 +1,10 @@
 #ifndef GENERATOR_H
 #define GENERATOR_H
 
-#include <memory>
 #include <queue>
+#include <vector>
 #include <random>
 #include <unordered_map>
-#include <vector>
 
 #include "../types.h"
 #include "integrator.h"

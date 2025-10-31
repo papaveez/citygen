@@ -2,10 +2,7 @@
 #define TYPES_H 
 
 #include <cassert>
-#include <cmath>
-#include <limits>
 #include <ostream>
-#include <unordered_map>
 
 #include "raylib.h"
 

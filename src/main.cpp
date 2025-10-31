@@ -6,11 +6,9 @@
 
 #define RAYGUI_IMPLEMENTATION
 
-#include "ui.h"
-
 #include "generation/generator.h"
 #include "generation/tensor_field.h"
-
+#include "ui.h"
 #include "const.h"
 
 

@@ -43,25 +43,6 @@ bool RoadStorage::is_leaf(const qnode_id& id) const {
 }
 
 
-void RoadStorage::subdivide(const qnode_id& head_ptr) {
-    const Box<double> bbox = qnodes_[head_ptr].bbox;
-    auto parts = partition(bbox, qnodes_[head_ptr].data);
-
-    std::array<Box<double>, 4> sub_bbox = bbox.quadrants();
-
-    for (int i=0;i<4; ++i) {
-        auto& [eigenfields, sublist] = parts[i];
-        if (sublist.empty()) continue;
-
-        qnode_id child_ptr = qnodes_.size();
-        qnodes_.emplace_back(sub_bbox[i], eigenfields);
-        qnodes_[child_ptr].data = std::move(sublist);
-
-        qnodes_[head_ptr].children[i] = child_ptr;
-    }
-}
-
-
 void RoadStorage::append_leaf_data(const qnode_id& leaf_ptr,
     const ef_mask& eigenfields, std::list<NodeHandle>& data) 
 {
@@ -72,7 +53,7 @@ void RoadStorage::append_leaf_data(const qnode_id& leaf_ptr,
 }
 
 
-void RoadStorage::insert_rec(int depth, const qnode_id& head_ptr, 
+void RoadStorage::insert_rec(const int& depth, const qnode_id& head_ptr, 
     const ef_mask& eigenfields, std::list<NodeHandle>& list)
 {
 
@@ -89,7 +70,6 @@ void RoadStorage::insert_rec(int depth, const qnode_id& head_ptr,
             return;
         }
 
-        // subdivide(head_ptr);
         list.splice(list.end(), qnodes_[head_ptr].data);
     }
 
@@ -98,7 +78,7 @@ void RoadStorage::insert_rec(int depth, const qnode_id& head_ptr,
     Box<double> bbox = qnodes_[head_ptr].bbox;
     auto parts = partition(bbox, list);
 
-    ++depth;
+    int next_depth = depth+1;
 
     std::array<Box<double>, 4> quadrants = bbox.quadrants();
 
@@ -115,7 +95,7 @@ void RoadStorage::insert_rec(int depth, const qnode_id& head_ptr,
         }
 
         insert_rec(
-            depth,
+            next_depth,
             child_ptr,
             sub_dirs,
             sublist
@@ -130,55 +110,41 @@ RoadStorage::in_circle_rec(const qnode_id& head_ptr,
 {
     const QuadNode& head = qnodes_[head_ptr];
 
-    if ( !(head.eigenfields & query.eigenfields) 
-        || (query.outer_bbox & head.bbox).is_empty()) 
-    {
+    // quick reject
+    if (!(head.eigenfields & query.eigenfields) ||
+        (query.outer_bbox & head.bbox).is_empty()) 
         return false;
-    }
 
-    // if query.inner_bbox ⊆ qnode.bbox
-    if ((head.bbox | query.inner_bbox) == query.inner_bbox) {
+    // if query.inner_bbox ⊆ qnode.bbox, delegate to bbox query
+    if ((head.bbox | query.inner_bbox) == query.inner_bbox)
         return in_bbox_rec(head_ptr, query);
-    }
-
-    bool flag = false;
 
 
+
+    // leaf case
     if (is_leaf(head_ptr)) {
         for (const NodeHandle& handle : head.data) {
-            if (!(get_eigenfields(handle) & query.eigenfields))
-                continue;
+            if (!(get_eigenfields(handle) & query.eigenfields)) continue;
 
-            DVector2 sep = query.centre - get_pos(handle);
-            if (dot_product(sep, sep) > query.radius2) continue;
+            DVector2 diff = query.centre - get_pos(handle);
+            if (dot_product(diff, diff) > query.radius2) continue;
 
-            if (query.gather) {
-                query.harvest.push_back(handle);
-                flag = true;
-            } else {
-                return true;
-            }
+            if (query.gather) query.harvest.push_back(handle);
+            else return true;
         }
 
-        return flag;
+        return query.gather && !query.harvest.empty();
     }
 
-    for (int q=0; q<4; ++q) {
-        const qnode_id& child_ptr = head.children[q];
-
+    for (const qnode_id& child_ptr : head.children) {
         if (child_ptr == NullQNode) continue;
-        
 
         if (in_circle_rec(child_ptr, query)) {
-            if (query.gather) {
-                flag = true;
-            } else {
-                return true;
-            }
+            if (!query.gather) return true;
         }
     }
 
-    return flag;
+    return query.gather && !query.harvest.empty();
 }
 
 
@@ -186,61 +152,70 @@ bool
 RoadStorage::in_bbox_rec(const qnode_id& head_ptr, BBoxQuery& query) const {
     const QuadNode& head = qnodes_[head_ptr];
 
-    // TODO: fix
-    //
-    if ( ( query.inner_bbox & head.bbox ).is_empty() 
-        || !(head.eigenfields & query.eigenfields))
+    if ((query.inner_bbox & head.bbox).is_empty() || 
+        !(head.eigenfields & query.eigenfields))
         return false;
 
+
+    // node bbox fully contained
     if ((query.inner_bbox | head.bbox) == query.inner_bbox) {
-        if (query.gather && !head.data.empty()) {
-            for (auto& hd : head.data) {
-                if (!(get_eigenfields(hd) & query.eigenfields)) continue;
-
-                query.harvest.push_back(hd);
-            }
-
-            return !is_leaf(head_ptr) || !head.data.empty();
-        } else if (!query.gather) {
-            return !is_leaf(head_ptr) || !head.data.empty();
-        }
+        if (query.gather)
+            gather_data_rec(head_ptr, query);
+        
+        return !is_leaf(head_ptr) || !head.data.empty();
     }
 
 
-    bool flag = false;
 
     if (is_leaf(head_ptr)) {
         for (const NodeHandle& hd : head.data)  {
-            if (query.inner_bbox.contains(get_pos(hd))
-                && (get_eigenfields(hd) & query.eigenfields))
+            if ((query.inner_bbox.contains(get_pos(hd))) && 
+                (get_eigenfields(hd) & query.eigenfields))
             {
-                if (query.gather) {
-                    query.harvest.push_back(hd);
-                    flag = true;
-                } else {
-                    return true;
-                }
+                if (query.gather) query.harvest.push_back(hd);
+                else return true;
             }
         }
 
-        return flag;
+        return query.gather && !query.harvest.empty();
     }
 
 
-    for (int i=0; i<4; ++i) {
-        qnode_id child_ptr = head.children[i];
+    for (const qnode_id& child_ptr : head.children) {
         if (child_ptr == NullQNode) continue;
 
         if (in_bbox_rec(child_ptr, query)) {
-            if (query.gather) {
-                flag = true;
-            } else {
-                return true;
-            }
+            if (!query.gather) return true;
         }
     }
 
-    return flag;
+    return query.gather && !query.harvest.empty();
+}
+
+
+bool
+RoadStorage::gather_data_rec(const qnode_id& head_ptr, BBoxQuery& query) const {
+    const QuadNode& head = qnodes_[head_ptr];
+
+    if (is_leaf(head_ptr)) {
+        for (const NodeHandle& hd : head.data) {
+            if (query.eigenfields & get_eigenfields(hd))
+                query.harvest.push_back(hd);
+        }
+        return !query.harvest.empty();
+    }
+
+    bool any = false;
+
+    for (int i=0; i<4; ++i) {
+        const qnode_id& child_ptr = head.children[i];
+        if (child_ptr == NullQNode) continue;
+
+        if (qnodes_[child_ptr].eigenfields & query.eigenfields)
+            any |= gather_data_rec(child_ptr, query);
+    }
+
+    return any;
 }
 
 
@@ -356,6 +331,7 @@ RoadStorage::has_nearby_point(DVector2 centre, double radius, ef_mask eigenfield
     CircleQuery query(eigenfields, centre, radius, false);
     return in_circle_rec(root_, query);
 }
+
 
 std::list<NodeHandle>
 RoadStorage::nearby_points(DVector2 centre, double radius, ef_mask eigenfields) const {

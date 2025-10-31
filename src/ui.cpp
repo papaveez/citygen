@@ -3,11 +3,8 @@
 #include <cstdint>
 #include <limits>
 
-#include "generation/integrator.h"
-#include "generation/road_storage.h"
-#include "raylib.h"
-#include "raygui.h"
 #include "raymath.h"
+
 #include "types.h"
 
 // #define DRAW_NODES
@@ -359,7 +356,7 @@ void Renderer::test_spatial() {
                     ++i;
                 }
 
-                DrawSplineLinear(pts, n, 3.0f, dir_== Major ? RED : BLUE);
+                DrawSplineLinear(pts, n, 3.0f, dir_ == Major ? RED : BLUE);
             }
 
             DVector2 diff = points_.back() - ctx_.mouse_world_pos;
@@ -428,8 +425,8 @@ void Renderer::main_loop() {
     ClearBackground(RAYWHITE);
     #ifdef STORAGE_TEST 
         BeginMode2D(ctx_.camera); ctx_.is_2d_mode = true; {
-            test_spatial();
             test_draw_spatial(generator_ptr_->root_);
+            test_spatial();
         } EndMode2D(); ctx_.is_2d_mode = false;
         // draw current dir
         

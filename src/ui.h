@@ -3,13 +3,10 @@
 
 #include <cassert>
 
-#include "generation/road_storage.h"
 #include "raylib.h"
 #include "raygui.h"
 
-#include "generation/tensor_field.h"
 #include "generation/generator.h"
-
 #include "const.h"
 
 struct RenderContext {
@@ -149,6 +146,7 @@ private:
 
     #ifdef STORAGE_TEST 
     std::list<DVector2> points_;
+    Eigenfield dir_ = Major;
 
     void test_spatial();
     void test_draw_spatial(qnode_id head_ptr);
