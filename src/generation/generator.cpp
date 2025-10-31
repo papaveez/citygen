@@ -188,8 +188,8 @@ int RoadGenerator::generate_all_roads(RoadType road_type) {
     };
 
 
-    connect_roads(road_type, Major);
-    connect_roads(road_type, Minor);
+    // connect_roads(road_type, Major);
+    // connect_roads(road_type, Minor);
 
     return k;
 }

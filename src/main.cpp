@@ -8,7 +8,7 @@
 
 #include "generation/generator.h"
 #include "generation/tensor_field.h"
-#include "ui.h"
+#include "render/ui.h"
 #include "const.h"
 
 
@@ -42,7 +42,7 @@ int main(int argc, char** argv)
             ctx.viewport
     );
 
-    Renderer renderer = Renderer(ctx, &tf, &generator);
+    UI ui(ctx, &tf, &generator);
 
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "MapGen");
         ctx.camera.zoom = 1.0f;
@@ -86,7 +86,7 @@ int main(int argc, char** argv)
             
             BeginDrawing(); ctx.is_drawing = true; {
                 // Renderer::main loop here
-                renderer.main_loop();
+                ui.main_loop();
 
                 DrawFPS(0, 0);
             } EndDrawing(); ctx.is_drawing = false;

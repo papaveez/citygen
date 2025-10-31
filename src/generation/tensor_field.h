@@ -15,6 +15,7 @@ struct Tensor {
     double r;
     double theta;
 
+    static Tensor degenerate();
     static Tensor from_a_b(const double& a, const double& b);
     static Tensor from_r_theta(const double& r, const double& theta);
     static Tensor from_xy(const DVector2& xy);
@@ -44,8 +45,7 @@ class BasisField {
         double size_;
         double decay_;
 
-        virtual Tensor get_tensor(const DVector2& pos) const = 0;
-        virtual bool force_degenerate(const DVector2& pos);
+        virtual Tensor get_tensor(const DVector2& pos) const;
         double get_tensor_weight(const DVector2& pos) const;
 
     public:
@@ -54,6 +54,9 @@ class BasisField {
         virtual ~BasisField() = default;
 
         const DVector2& get_centre() const;
+        const double& get_size() const;
+        const double& get_decay() const;
+
         void set_centre(DVector2 centre);
         void set_size(double size);
         void set_decay(double decay);
@@ -76,31 +79,33 @@ class Grid : public BasisField {
         void set_theta(double _theta);
 };
 
+enum class BasisFieldType {
+    Grid,
+    Radial
+};
+
 class Radial : public BasisField {
     public:
         Radial(DVector2 centre);
         Radial(DVector2 centre, double size, double decay);
 
-
         Tensor get_tensor(const DVector2& pos) const override;
 };
 
 
-class TensorField {
-    private:
-        std::vector<std::unique_ptr<BasisField>> basis_fields;
+struct TensorField {
+    std::vector<std::pair<BasisFieldType, std::unique_ptr<BasisField>>> basis_fields;
 
-    public:
-        TensorField();
-        void clear();
-        
-        TensorField(std::vector<std::unique_ptr<BasisField>>&& _basis_fields);
+    TensorField();
+    size_t size() const;
 
-        void add_basis_field(std::unique_ptr<BasisField> ptr);
-        
+    void clear();
 
-        Tensor sample(const DVector2& pos) const;
-        std::vector<DVector2> get_basis_centres() const;
+    void add_grid(Grid&& grid);
+    void add_radial(Radial&& radial);
+
+    Tensor sample(const DVector2& pos) const;
+    std::vector<DVector2> get_basis_centres() const;
 };
 
 

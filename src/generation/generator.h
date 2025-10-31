@@ -121,16 +121,10 @@ class RoadGenerator : public RoadStorage {
         void push_road(std::list<DVector2>& points, RoadType road, Eigenfield ef);
 
         DVector2 tangent(const NodeHandle& handle) const;
+
         std::optional<NodeHandle> joining_candidate(const NodeHandle& handle) const;
         std::list<DVector2> joining_streamline(double dl, DVector2 x0, DVector2 x1) const;
         void connect_roads(RoadType road, Eigenfield ef);
-
-
-        // std::optional<NodeHandle> 
-        // joining_candidate(const double& rad, const double& max_node_sep, const double& theta_max, const DVector2& pos, 
-        //     const DVector2& road_direction, const std::unordered_set<NodeHandle>& forbidden) const;
-        //
-        // void connect_roads(RoadType road, Eigenfield dir);
 
 
     public:

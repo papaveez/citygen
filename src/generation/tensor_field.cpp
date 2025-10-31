@@ -1,7 +1,13 @@
 #include "tensor_field.h"
+#include <memory>
 
 
 // ****** Tensor ******
+
+Tensor Tensor::degenerate() {
+    return from_a_b(0, 0);
+}
+
 
 Tensor Tensor::from_a_b(const double& a, const double& b) {
     Tensor out = Tensor {a, b};
@@ -86,7 +92,6 @@ Tensor operator*(double left, const Tensor& right) {
 }
 
 
-
 // ****** BasisField ******
 
 BasisField::BasisField(DVector2 centre) 
@@ -102,22 +107,34 @@ const DVector2& BasisField::get_centre() const {
 }
 
 
+const double& BasisField::get_size() const {
+    return size_;
+}
+
+
+const double& BasisField::get_decay() const {
+    return decay_;
+}
+
+
 void BasisField::set_centre(DVector2 centre) {
     centre_ = centre;
 }
 
+
 void BasisField::set_size(double size) {
     size_ = size;
 }
+
 
 void BasisField::set_decay(double decay) {
     decay_ = decay;
 }
 
 
-bool BasisField::force_degenerate(const DVector2& pos) {
-    return false;
-}
+Tensor BasisField::get_tensor(const DVector2& pos) const {
+    return Tensor::degenerate();
+} 
 
 
 double BasisField::get_tensor_weight(const DVector2& pos) const {
@@ -193,24 +210,35 @@ Tensor Radial::get_tensor(const DVector2& pos) const {
 TensorField::TensorField() {}
 
 
-void TensorField::clear() {
-    basis_fields.clear();
+size_t TensorField::size() const {
+    return basis_fields.size();
 }
 
 
-TensorField::TensorField(std::vector<std::unique_ptr<BasisField>>&& _basis_fields) 
-    : basis_fields(std::move(_basis_fields)) {}
+void TensorField::add_grid(Grid&& grid) {
+    basis_fields.push_back({
+        BasisFieldType::Grid,
+        std::make_unique<Grid>(std::move(grid))
+    });
+}
 
 
-void TensorField::add_basis_field(std::unique_ptr<BasisField> bf) {
-    basis_fields.push_back(std::move(bf));
+void TensorField::add_radial(Radial&& radial) {
+    basis_fields.push_back({
+        BasisFieldType::Radial,
+        std::make_unique<Radial>(std::move(radial))
+    });
+}
+
+void TensorField::clear() {
+    basis_fields.clear();
 }
 
 
 Tensor TensorField::sample(const DVector2& pos) const {
     Tensor out; // new degenerate tensor
 
-    for (auto& x : basis_fields) {
+    for (auto& [_, x] : basis_fields) {
         Tensor basis_field_tensor = x->get_weighted_tensor(pos);
         out = out + basis_field_tensor;
     }
@@ -223,8 +251,8 @@ Tensor TensorField::sample(const DVector2& pos) const {
 
 std::vector<DVector2> TensorField::get_basis_centres() const {
     std::vector<DVector2> out;
-    for (auto& basis : basis_fields) {
-        out.push_back(basis->get_centre());
+    for (auto& [_, x] : basis_fields) {
+        out.push_back(x->get_centre());
     }
 
     return out;
