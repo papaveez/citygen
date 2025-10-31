@@ -1,11 +1,13 @@
 #include "generator.h"
-#include "integrator.h"
-// #include "node_storage.h"
 
+#include <algorithm>
 #include <cassert>
-#include <iostream>
+#include <cstdint>
 #include <iterator>
+#include <limits>
 #include <list>
+
+#include "road_storage.h"
 
 GeneratorParameters::GeneratorParameters(
         int max_seed_retries,
@@ -120,7 +122,7 @@ void RoadGenerator::extend_road(
 }
 
 
-std::optional<std::list<DVector2>>
+std::list<DVector2>
 RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) {
     Integration forward  (seed_point, false);
     Integration backward (seed_point, true );
@@ -171,8 +173,6 @@ RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) 
     result.splice(result.end(), backward.points);
     result.splice(result.end(), forward.points);
 
-    if (result.size() < min_streamline_size_) return {};
-
     return result;
 }
 
@@ -183,32 +183,28 @@ int RoadGenerator::generate_all_roads(RoadType road_type) {
     std::optional<DVector2> seed = get_seed(road_type, ef);
     int k = 0;
     while (seed.has_value()) {
-        std::optional<std::list<DVector2>> new_streamline
-            = generate_road(road_type, seed.value(), ef);
+        std::list<DVector2> streamline = generate_road(road_type, seed.value(), ef);
 
-        if (new_streamline.has_value()) {
-            simplify_road(road_type, new_streamline.value());
+        simplify_streamline(road_type, streamline);
 
-            if (new_streamline.value().size() >= min_streamline_size_) {
-                push_road(new_streamline.value(), road_type, ef);
-                k += 1;
-                ef = flip(ef);
-            }
+        if (streamline.size() >= tangent_samples_) { 
+            push_road(streamline, road_type, ef);
+            k += 1;
+            ef = flip(ef);
         }
         
         seed = get_seed(road_type, ef);
     };
 
-    std::cout << "generated " << k << " roads" << std::endl;
 
-    // connect_roads(road, Major);
-    // connect_roads(road, Minor);
+    connect_roads(road_type, Major);
+    connect_roads(road_type, Minor);
 
     return k;
 }
 
 
-void RoadGenerator::simplify_road(RoadType road, std::list<DVector2>& points) const {
+void RoadGenerator::simplify_streamline(RoadType road, std::list<DVector2>& points) const {
     assert(params_.at(road).epsilon > 0.0);
     douglas_peucker(params_.at(road).epsilon, params_.at(road).node_sep2, points, points.begin(), points.end());
 }
@@ -269,116 +265,136 @@ void RoadGenerator::push_road(std::list<DVector2>& points, RoadType road, Eigenf
     insert(points, road, ef);
 }
 
-// standard joining candidate algorithm
-// std::optional<NodeHandle>
-// RoadGenerator::joining_candidate(const double& rad, const double& max_node_sep2, const double& theta_max, 
-//     const DVector2& pos, const DVector2& road_direction, const std::unordered_set<NodeHandle>& forbidden) const 
-// {
-//     std::list<NodeHandle> nearby = 
-//         storage_.nearby_points(pos, rad, Major | Minor);
-//
-//     std::optional<NodeHandle> best_node;
-//
-//     double min_dist2 = std::numeric_limits<double>::infinity();
-//
-//     for (const NodeHandle& candidate_handle: nearby) {
-//
-//         if (forbidden.contains(candidate_handle)) continue;
-//
-//         DVector2 join_vector = storage_.get_pos(candidate_handle);
-//
-//         if (dot_product(join_vector, road_direction) < 0) continue; // opposite directions.
-//
-//         double d2 = dot_product(join_vector, join_vector);
-//
-//         if (d2 < max_node_sep2)
-//             return candidate_handle;
-//
-//
-//         double theta = std::abs(vector_angle(road_direction, join_vector));
-//
-//         if (theta < theta_max && d2 < min_dist2) {
-//             min_dist2 = d2;
-//             best_node = candidate_handle;
-//         }
-//     }
-//
-//     return best_node;
-// }
 
-// void RoadGenerator::connect_roads(RoadType road, Eigenfield dir) {
-//     int k = 0;
-//     for (Streamline& s : streamlines_[road].get_streamlines(dir)) {
-//         if (s.front() == s.back()) continue; // ignore circles
-//
-//         DVector2 front_pos = nodes_[s.front()].pos;
-//         DVector2 back_pos = nodes_[s.back()].pos;
-//
-//         std::unordered_set<node_id> front_forbidden;
-//         std::unordered_set<node_id> back_forbidden;
-//
-//
-//         // first min_streamline_size_ nodes
-//         Streamline::iterator last_front_forbidden = std::next(s.begin(), min_streamline_size_-1);
-//         for (auto it = s.begin(); it != last_front_forbidden; ++it) {
-//             front_forbidden.insert(*it);
-//         }
-//
-//         // DVector2 front_direction = front_pos - nodes_[*std::prev(last_forbidden)].pos;
-//         DVector2 front_direction = front_pos - nodes_[*last_front_forbidden].pos;
-//
-//
-//
-//         Streamline::iterator last_back_forbidden = std::prev(s.end(), min_streamline_size_);
-//         for (auto it = std::prev(s.end()); it != last_back_forbidden; ++it) {
-//             back_forbidden.insert(*it);
-//         }
-//
-//
-//         DVector2 back_direction = back_pos - nodes_[*last_back_forbidden].pos;
-//
-//
-//         std::optional<node_id> front_join 
-//             = joining_candidate(params_.at(road).d_lookahead, params_.at(road).node_sep2, params_.at(road).theta_max,
-//                     front_pos, front_direction, front_forbidden);    
-//         std::optional<node_id> back_join
-//             = joining_candidate(params_.at(road).d_lookahead, params_.at(road).node_sep2, params_.at(road).theta_max,
-//                     back_pos, back_direction, back_forbidden);
-//
-//         if (front_join.has_value()) {
-//             // connect(s, s.front(), front_join.value());
-//             s.push_front(front_join.value());
-//             ++k;
-//         }
-//
-//         if (back_join.has_value()) {
-//             // connect(s, s.back(), back_join.value());
-//             s.push_back(back_join.value());
-//             ++k;
-//         }
-//
-//     }
-//
-//     std::cout << "Connected " << k << " roads" <<std::endl;
-// }
+DVector2 RoadGenerator::tangent(const NodeHandle& handle) const {
+    const Road& road = get_road(handle);
+
+    int idx = handle.idx;
+
+    NodeHandle left = handle;
+    NodeHandle right = handle;
+
+    int l = tangent_samples_/2;
+
+    left.idx = std::max(static_cast<int>(road.begin), idx-l);
+    right.idx = std::min(static_cast<int>(road.end-1), idx+l);
+
+    return get_pos(right)-get_pos(left);
+}
 
 
-// void RoadGenerator::add_intersections(RoadType road, Eigenfield dir, Streamline& s) {
-//     const double& sep = params_.at(road).node_sep;
-//
-//     for (auto it = s.begin(); it != s.end(); ++it) {
-//         std::list<node_id> nearby_opposite_dir = spatial_.nearby_points(nodes_[*it].pos, sep, flip(dir));
-//         if (nearby_opposite_dir.empty()) continue;
-//
-//         // create shared point
-//         std::optional<node_id> closest;
-//         double d_min = 
-//
-//         for (const node_id& id : nearby_opposite_dir) {
-//             if (dot_product(const TVector2<T> &a, const TVector2<T> &b))
-//         }
-//     }
-// }
+std::optional<NodeHandle>
+RoadGenerator::joining_candidate(const NodeHandle& handle) const {
+    const RoadHandle& road_handle = handle.road_handle;
+    const Road& road = get_road(road_handle);
+
+    std::list<NodeHandle> nearby = nearby_points(
+        get_pos(handle), 
+        params_.at(road_handle.road_type).d_lookahead,
+        Eigenfield(Major) | Eigenfield(Minor)
+    );
+
+    double theta_max = params_.at(road_handle.road_type).theta_max;
+    DVector2 pos = get_pos(handle);
+    DVector2 local_dir = tangent(handle);
+
+    bool is_endpoint = (handle.idx == road.end - 1 || handle.idx == road.begin);
+
+    if (handle.idx == road.begin) local_dir = local_dir*-1.0;
+
+    double min_dist2 = std::numeric_limits<double>::infinity();
+    std::optional<NodeHandle> best_candidate;
+
+    for (const NodeHandle& candidate : nearby) {
+        if (candidate.road_handle == road_handle) continue;
+
+        DVector2 join_vector = get_pos(candidate) - pos;
+
+        if (is_endpoint && dot_product(join_vector, local_dir) < 0)
+            continue;
+
+        double dist2 = dot_product(join_vector, join_vector);
+
+        if (dist2 > min_dist2) continue;
+
+        double leave_angle = std::abs(
+            vector_angle(local_dir, join_vector)
+        );
+
+        if (leave_angle < theta_max) {
+            dist2 = min_dist2;
+            best_candidate = candidate;
+        }
+    }
+
+    return best_candidate;
+}
+
+
+std::list<DVector2>
+RoadGenerator::joining_streamline(double dl, DVector2 x0, DVector2 x1) const {
+    DVector2 diff = (x1 - x0);
+    double dist = std::hypot(diff.x, diff.y);
+
+    dl = std::min(dist/tangent_samples_, dl);
+
+    DVector2 inc = diff*dl/dist;
+
+    std::list<DVector2> out = {x0};
+
+    double dl2 = dl*dl;
+
+    while (dot_product(diff, diff) > dl2) {
+        out.push_back(out.back() + inc);
+        diff = x1 - out.back();
+    }
+
+    out.push_back(x1);
+    return out;
+}
+
+
+void RoadGenerator::connect_roads(RoadType road_type, Eigenfield ef) {
+    RoadHandle road_handle {
+        0,
+        road_type,
+        ef
+    };
+
+    std::uint32_t count = road_count(road_type, ef);
+
+    double dl = params_.at(road_type).node_sep;
+
+    for (std::uint32_t idx = 0; idx < count; ++idx) {
+        road_handle.idx = idx;
+        const Road& road = get_road(road_handle);
+
+        NodeHandle first = { road.begin, road_handle };
+        NodeHandle last  = { road.end-1,   road_handle };
+
+        std::optional<NodeHandle> first_join = joining_candidate(first);
+        std::optional<NodeHandle> last_join = joining_candidate(last);
+
+        if (first_join.has_value()) {
+            std::list<DVector2> s_join = joining_streamline(
+                dl,
+                get_pos(first),
+                get_pos(first_join.value())
+            );
+
+            insert(s_join, road_type, ef, true);
+        }
+        if (last_join.has_value()) {
+            std::list<DVector2> s_join = joining_streamline(
+                dl,
+                get_pos(last),
+                get_pos(last_join.value())
+            );
+
+            insert(s_join, road_type, ef, true);
+        }
+    }
+}
 
 
 RoadGenerator::RoadGenerator(

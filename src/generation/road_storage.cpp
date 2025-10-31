@@ -6,10 +6,6 @@ Eigenfield flip(Eigenfield ef) {
 }
 
 
-const Road& RoadStorage::get_road(const RoadHandle& h) const {
-    return roads_[h.road_type][h.eigenfield][h.idx];
-}
-
 
 std::array<std::pair<ef_mask, std::list<NodeHandle>>, 4> 
 RoadStorage::partition(const Box<double>& bbox, std::list<NodeHandle>& s) {
@@ -271,6 +267,16 @@ ef_mask RoadStorage::get_eigenfields(const NodeHandle& h) const {
 }
 
 
+const Road& RoadStorage::get_road(const RoadHandle& h) const {
+    return roads_[h.road_type][h.eigenfield][h.idx];
+}
+
+
+const Road& RoadStorage::get_road(const NodeHandle& h) const {
+    return get_road(h.road_handle);
+}
+
+
 void RoadStorage::reset_storage(Box<double> new_viewport) {
     viewport_ = new_viewport;
     root_ = 0;
@@ -288,16 +294,16 @@ void RoadStorage::reset_storage(Box<double> new_viewport) {
 }
 
 
-
 void RoadStorage::insert(const std::list<DVector2>& points,
-    RoadType road_type, Eigenfield eigenfield) {
+    RoadType road_type, Eigenfield eigenfield, bool is_join) {
     if (points.size() == 0) return;
 
     std::list<NodeHandle> node_handles;
 
     Road new_road = {
         static_cast<std::uint32_t>(nodes_.size()),
-        static_cast<std::uint32_t>(nodes_.size() + points.size())
+        static_cast<std::uint32_t>(nodes_.size() + points.size()),
+        is_join
     };
 
 
@@ -356,4 +362,9 @@ RoadStorage::nearby_points(DVector2 centre, double radius, ef_mask eigenfields) 
     CircleQuery query(eigenfields, centre, radius, true);
     in_circle_rec(root_, query);
     return query.harvest;
+}
+
+
+bool RoadStorage::is_connective_road(const RoadHandle& rh) const {
+    return get_road(rh).is_joining_road;
 }

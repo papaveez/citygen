@@ -143,6 +143,8 @@ rad,
 void Renderer::draw_streamlines(RoadType road_type, Eigenfield ef) const {
     // const std::vector<Streamline>& sls = generator_ptr_->get_streamlines(road, dir);
 
+    bool draw_joins = IsKeyDown(KEY_J);
+
     const RoadStyle& style = road_styles_.at(road_type);
 
     std::uint32_t num_roads = generator_ptr_->road_count(road_type, ef);
@@ -153,6 +155,8 @@ void Renderer::draw_streamlines(RoadType road_type, Eigenfield ef) const {
             road_type,
             ef
         };
+
+        bool highlight = draw_joins & generator_ptr_->is_connective_road(handle);
 
 
         auto [len, data] = generator_ptr_->get_road_points(handle);
@@ -168,7 +172,8 @@ void Renderer::draw_streamlines(RoadType road_type, Eigenfield ef) const {
             data,
             len,
             style.width,
-            style.colour
+            // style.colour
+            highlight ? RED : style.colour
         );
 
 #ifdef DRAW_NODES

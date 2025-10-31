@@ -9,7 +9,6 @@
 
 #include "../types.h"
 #include "integrator.h"
-// #include "node_storage.h"
 #include "road_storage.h"
 #include "../const.h"
 
@@ -84,7 +83,7 @@ class RoadGenerator : public RoadStorage {
         std::default_random_engine gen_;
         std::uniform_real_distribution<double> dist_;
 
-        int min_streamline_size_ = 5;
+        int tangent_samples_ = 5;
         Box<double> viewport_;
 
         bool in_bounds(const DVector2& p) const;
@@ -101,13 +100,13 @@ class RoadGenerator : public RoadStorage {
             const Eigenfield& ef
         ) const;
 
-        std::optional<std::list<DVector2>>
+        std::list<DVector2>
         generate_road(RoadType road, DVector2 seed_point, Eigenfield ef);
 
         int generate_all_roads(RoadType road);
 
         
-        void simplify_road(RoadType road, std::list<DVector2>& points) const;
+        void simplify_streamline(RoadType road, std::list<DVector2>& points) const;
         void douglas_peucker(
             const double& epsilon,
             const double& min_sep2,
@@ -122,11 +121,16 @@ class RoadGenerator : public RoadStorage {
 #endif
         void push_road(std::list<DVector2>& points, RoadType road, Eigenfield ef);
 
+        DVector2 tangent(const NodeHandle& handle) const;
+        std::optional<NodeHandle> joining_candidate(const NodeHandle& handle) const;
+        std::list<DVector2> joining_streamline(double dl, DVector2 x0, DVector2 x1) const;
+        void connect_roads(RoadType road, Eigenfield ef);
+
 
         // std::optional<NodeHandle> 
         // joining_candidate(const double& rad, const double& max_node_sep, const double& theta_max, const DVector2& pos, 
-            // const DVector2& road_direction, const std::unordered_set<NodeHandle>& forbidden) const;
-
+        //     const DVector2& road_direction, const std::unordered_set<NodeHandle>& forbidden) const;
+        //
         // void connect_roads(RoadType road, Eigenfield dir);
 
 

@@ -51,13 +51,21 @@ struct RoadHandle {
     std::uint32_t idx;
     RoadType road_type;
     Eigenfield eigenfield;
+
+    bool operator==(const RoadHandle& other) const {
+        return idx==other.idx 
+            && road_type==other.road_type 
+            && eigenfield == other.eigenfield;
+    }
 };
+
 
 struct Road {
     std::uint32_t begin;
     std::uint32_t end;
-    // RoadHandle road_handle;
+    bool is_joining_road;
 };
+
 
 struct NodeHandle {
     std::uint32_t idx;
@@ -124,9 +132,6 @@ private:
     std::array<std::array<std::vector<Road>, EigenfieldCount>, RoadTypeCount> 
         roads_;
 
-    const Road& get_road(const RoadHandle& h) const;
-
-
     // quadtree
     Box<double> viewport_;
 
@@ -181,9 +186,17 @@ public:
     const DVector2& get_pos(const NodeHandle& h) const;
     ef_mask get_eigenfields(const NodeHandle& h) const;
 
+    const Road& get_road(const RoadHandle& h) const;
+    const Road& get_road(const NodeHandle& h) const;
+
     void reset_storage(Box<double> new_viewport);
 
-    void insert(const std::list<DVector2>& points, RoadType road_type, Eigenfield eigenfield);
+    void insert(
+        const std::list<DVector2>& points,
+        RoadType road_type,
+        Eigenfield eigenfield,
+        bool is_join = false
+    );
     
     bool has_nearby_point(
         DVector2 centre,
@@ -200,6 +213,9 @@ public:
 public:
     std::pair<size_t, const Vector2*> get_road_points(const RoadHandle& road_handle) const;
     std::uint32_t road_count(RoadType road_type, Eigenfield eigenfield) const;
+
+
+    bool is_connective_road(const RoadHandle& rh) const;
 };
 
 #endif
