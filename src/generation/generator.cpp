@@ -1,4 +1,5 @@
 #include "generator.h"
+#include "integrator.h"
 
 GeneratorParameters::GeneratorParameters(
         int max_seed_retries,
@@ -169,7 +170,7 @@ RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) 
 
 
 int RoadGenerator::generate_all_roads(RoadType road_type) {
-    Eigenfield ef(Major);
+    Eigenfield ef = Eigenfield::major();
 
     std::optional<DVector2> seed = get_seed(road_type, ef);
     int k = 0;
@@ -181,7 +182,8 @@ int RoadGenerator::generate_all_roads(RoadType road_type) {
         if (streamline.size() >= tangent_samples_) { 
             push_road(streamline, road_type, ef);
             k += 1;
-            ef = flip(ef);
+
+            ef = ef.opposite();
         }
         
         seed = get_seed(road_type, ef);
@@ -249,8 +251,8 @@ void RoadGenerator::douglas_peucker(const double& epsilon, const double& min_sep
 
 void RoadGenerator::push_road(std::list<DVector2>& points, RoadType road, Eigenfield ef) {
     if (points.front() != points.back()) {
-        add_candidate_seed(points.front(), flip(ef));
-        add_candidate_seed(points.back(), flip(ef));
+        add_candidate_seed(points.front(), ef.opposite());
+        add_candidate_seed(points.back(), ef.opposite());
     }
 
     insert(points, road, ef);
@@ -282,7 +284,7 @@ RoadGenerator::joining_candidate(const NodeHandle& handle) const {
     std::list<NodeHandle> nearby = nearby_points(
         get_pos(handle), 
         params_.at(road_handle.road_type).d_lookahead,
-        Eigenfield(Major) | Eigenfield(Minor)
+        Eigenfield::major() | Eigenfield::minor()
     );
 
     double theta_max = params_.at(road_handle.road_type).theta_max;
@@ -429,7 +431,7 @@ void RoadGenerator::reset(Box<double> new_viewport) {
 
 
 void RoadGenerator::clear() {
-    for (int i=0; i<EigenfieldCount;++i) {
+    for (int i=0; i<Eigenfield::count;++i) {
         seeds_[i] = {};
     }
 

@@ -8,11 +8,22 @@
 
 struct RenderContext {
     int width, height;
-    Camera2D camera;
-    bool is_drawing;
-    bool is_2d_mode;
-    DVector2 mouse_world_pos;
-    Box<double> viewport;
+    Camera2D camera = {0};
+    bool is_window = false;
+    bool is_drawing = false;
+    bool is_2d_mode = false;
+    bool camera_locked = false;
+    DVector2 mouse_world_pos = {0.0, 0.0};
+    Box<double> viewport = Box(
+        {0,0},
+        DVector2{
+            static_cast<double>(width), 
+            static_cast<double>(height)
+        }
+    );
+
+
+    RenderContext(int w, int h) : width(w), height(h) {}
 };
 
 

@@ -1,7 +1,6 @@
 #ifndef UI_H
 #define UI_H
 
-#include "raylib.h"
 #include "renderer.h"
 
 enum Tool {
@@ -40,12 +39,25 @@ private:
     std::optional<Tool> selected_tool_;
     std::optional<std::function<void()>> brush_handler_;
 
-    Box<float> sidebar_bbox {
-        Vector2{0,0},
-        Vector2{
+    // optional id of the basis field being dragged around.
+
+    Box<int> toolbar_bbox_ {
+        IVector2{0,0},
+        IVector2{
             uiConfig.icon_size + 2*uiConfig.icon_padding,
-            static_cast<float>(ctx_.height)
+            ctx_.height
         }
+    };
+
+
+    std::optional<size_t> selected_basis_field_;
+    std::optional<size_t> dragged_basis_field_;
+    Box<int> editor_pane_bbox_ {
+        IVector2 {
+            ctx_.width - uiConfig.editor_pane_width,
+            0
+        },
+        IVector2 { ctx_.width, ctx_.height }
     };
 
     struct {
@@ -64,17 +76,21 @@ private:
     } grid_edit_;
 
     bool mouse_in_editor() const;
-
-    void handle_tool_click(Tool t);
+    
     void handle_radial_brush();
     void handle_grid_brush();
+
+    void handle_tool_click(Tool t);
 
     void reset_tensorfield();
 
     UIState state_ = FieldEditor;
 
-    void render_sidebar();
-    void render_field_artifacts_2d();
+    void render_toolbar();
+    void render_field_artifacts();
+    void render_editor_pane();
+        void draw_grid_properties  (size_t field_id);
+        void draw_radial_properties(size_t field_id);
 
 public:
     UI (RenderContext& ctx, TensorField* tf_ptr, RoadGenerator* gen_ptr);

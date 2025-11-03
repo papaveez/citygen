@@ -1,12 +1,6 @@
 #include "road_storage.h"
 
 
-Eigenfield flip(Eigenfield ef) {
-    return Eigenfield(ef.value == Major ? Minor : Major);
-}
-
-
-
 std::array<std::pair<ef_mask, std::list<NodeHandle>>, 4> 
 RoadStorage::partition(const Box<double>& bbox, std::list<NodeHandle>& s) {
     DVector2 mid = middle(bbox.min, bbox.max);
@@ -261,8 +255,8 @@ void RoadStorage::reset_storage(Box<double> new_viewport) {
     nodes_.clear();
     fnodes_.clear();
 
-    for (int i=0; i<RoadTypeCount; ++i) {
-        for (int j=0; j < EigenfieldCount; ++j) {
+    for (int i=0; i< RoadTypeCount; ++i) {
+        for (int j=0; j < Eigenfield::count; ++j) {
             roads_[i][j].clear();
         }
     }

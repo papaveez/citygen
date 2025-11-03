@@ -135,7 +135,9 @@ struct Box {
             && min.y >= max.y;
     }
 
-    bool contains(const TVector2<T>& vec) const {
+
+    template<typename U>
+    bool contains(const TVector2<U>& vec) const {
         return 
             min.x <= vec.x 
             && vec.x < max.x
@@ -149,6 +151,11 @@ struct Box {
 
     T height() const {
         return max.y - min.y;
+    }
+
+
+    TVector2<T> dimensions() const {
+        return max - min;
     }
 
     std::array<Box, 4> // TL TR BL BR

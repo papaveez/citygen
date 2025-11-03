@@ -9,7 +9,6 @@
 #include "../types.h"
 #include "integrator.h"
 #include "road_storage.h"
-#include "../const.h"
 
 
 enum IntegrationStatus {
@@ -78,7 +77,7 @@ class RoadGenerator : public RoadStorage {
         std::unique_ptr<NumericalFieldIntegrator> integrator_;
         std::vector<RoadType> road_types_;
         std::unordered_map<RoadType, GeneratorParameters> params_;
-        std::array<seed_queue, EigenfieldCount> seeds_;
+        std::array<seed_queue, Eigenfield::count> seeds_;
         std::default_random_engine gen_;
         std::uniform_real_distribution<double> dist_;
 
@@ -115,9 +114,6 @@ class RoadGenerator : public RoadStorage {
         ) const;
 
 
-#ifdef STORAGE_TEST
-    public:
-#endif
         void push_road(std::list<DVector2>& points, RoadType road, Eigenfield ef);
 
         DVector2 tangent(const NodeHandle& handle) const;

@@ -203,6 +203,17 @@ Tensor Radial::get_tensor(const DVector2& pos) const {
 }
 
 
+// ****** BasisFieldType ******
+
+const char* basis_field_string(BasisFieldType t) {
+    switch (t) {
+        case BasisFieldType::Radial:
+            return "Radial";
+        case BasisFieldType::Grid:
+            return "Grid";
+    }
+}
+
 
 // ****** TensorField ******
 

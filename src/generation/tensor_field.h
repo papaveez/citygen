@@ -79,10 +79,6 @@ class Grid : public BasisField {
         void set_theta(double _theta);
 };
 
-enum class BasisFieldType {
-    Grid,
-    Radial
-};
 
 class Radial : public BasisField {
     public:
@@ -91,6 +87,15 @@ class Radial : public BasisField {
 
         Tensor get_tensor(const DVector2& pos) const override;
 };
+
+
+enum class BasisFieldType {
+    Grid,
+    Radial
+};
+
+
+const char* basis_field_string(BasisFieldType t);
 
 
 struct TensorField {

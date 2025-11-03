@@ -10,7 +10,6 @@
 
 #include "integrator.h"
 #include "../types.h"
-#include "../const.h"
 
 
 using qnode_id = std::uint32_t;                
@@ -23,28 +22,6 @@ enum RoadType : size_t {
     SideStreet,
     RoadTypeCount
 };
-
-using ef_mask = char;
-
-struct Eigenfield {
-    enum Direction value;
-
-    constexpr Eigenfield(Direction v) : value(v) {}
-
-    constexpr operator size_t() const {return value;}
-    constexpr operator ef_mask() const {return 1<<value;}
-    constexpr operator Direction() const {return value;}
-    constexpr ef_mask mask() const {return 1<<value;}
-
-    constexpr bool operator == (const Eigenfield& other) const {return value == other.value;}
-    constexpr bool operator == (const Direction& other) const {return value == other;}
-
-    constexpr ef_mask operator | (const Eigenfield& other) const {
-        return static_cast<ef_mask>(other) | static_cast<ef_mask>(*this);
-    }
-};
-
-Eigenfield flip(Eigenfield ef);
 
 
 struct RoadHandle {
@@ -129,7 +106,7 @@ private:
     // node storage
     std::vector<DVector2> nodes_;
     std::vector<Vector2> fnodes_; // quick conversion to float for rendering
-    std::array<std::array<std::vector<Road>, EigenfieldCount>, RoadTypeCount> 
+    std::array<std::array<std::vector<Road>, Eigenfield::count>, RoadTypeCount> 
         roads_;
 
     // quadtree
@@ -185,9 +162,6 @@ protected:
         int leaf_capacity
     );
 
-#ifdef STORAGE_TEST
-public:
-#endif
     const DVector2& get_pos(const NodeHandle& h) const;
     ef_mask get_eigenfields(const NodeHandle& h) const;
 

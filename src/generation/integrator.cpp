@@ -8,10 +8,10 @@ NumericalFieldIntegrator::NumericalFieldIntegrator(
 
 DVector2 
 NumericalFieldIntegrator::get_vector(
-    const DVector2& x, const Direction& dir) const {
+    const DVector2& x, const Eigenfield& ef) const {
     Tensor t = field_->sample(x);
 
-    if (dir == Major) {
+    if (ef == Eigenfield::major()) {
         return t.get_major_eigenvector();
     } else {
         return t.get_minor_eigenvector();
@@ -26,13 +26,13 @@ RK4::RK4 (TensorField* field)
 
 DVector2 
 RK4::integrate(const DVector2& x, 
-    const Direction& dir, const double& dl) const { 
+    const Eigenfield& ef, const double& dl) const { 
     // return integration delta
     DVector2 dx = {dl, dl};
 
-    DVector2 k1 = get_vector(x, dir);
-    DVector2 k2 = get_vector(x + dx/2.0, dir);
-    DVector2 k4 = get_vector(x + dx, dir);
+    DVector2 k1 = get_vector(x, ef);
+    DVector2 k2 = get_vector(x + dx/2.0, ef);
+    DVector2 k4 = get_vector(x + dx, ef);
 
     return k1 + k2*4.0 + k4/6.0;
 }

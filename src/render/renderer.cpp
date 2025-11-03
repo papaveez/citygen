@@ -43,7 +43,7 @@ void Renderer::draw_roads_2d(RoadType road_type, Eigenfield eigenfield) const {
             data,
             len, 
             style.outline_width+style.width,
-            style.outline_colour
+            style.outline_col
         );
 
 
@@ -52,11 +52,11 @@ void Renderer::draw_roads_2d(RoadType road_type, Eigenfield eigenfield) const {
             data, 
             len, 
             style.width, 
-            style.colour
+            style.col
         );
 
-        // Color col = eigenfield == Major ? renderConfig.major_colour 
-        //                                 : renderConfig.minor_colour;
+        // Color col = eigenfield == Major ? renderConfig.major_col 
+        //                                 : renderConfig.minor_col;
         // for (int i=0; i<len; ++i) {
         //     DrawCircleV(data[i], 1, col);
         //     if (i>0) {
@@ -74,6 +74,7 @@ Renderer::Renderer(RenderContext& ctx, TensorField* tf_ptr, RoadGenerator* gen_p
 
 
 void Renderer::render_tensorfield() const {
+    assert(ctx_.is_window);
     assert(ctx_.is_drawing);
     assert(!ctx_.is_2d_mode);
 
@@ -90,17 +91,17 @@ void Renderer::render_tensorfield() const {
             draw_vector_line(
                 t.get_major_eigenvector(),
                 world_pos,
-                renderConfig.major_colour
+                renderConfig.major_col
             );
 
             draw_vector_line(
                 t.get_minor_eigenvector(),
                 world_pos,
-                renderConfig.minor_colour
+                renderConfig.minor_col
             );
 
 
-            DrawCircle(i, j, 1, renderConfig.degenerate_colour);
+            DrawCircle(i, j, 1, renderConfig.degenerate_col);
         }
     }
 }
@@ -114,7 +115,7 @@ void Renderer::render_map_2d() const {
         generator_ptr_->get_road_types();
 
     for (int i=road_types.size()-1; i>=0; --i) {
-        draw_roads_2d(road_types[i], Major);
-        draw_roads_2d(road_types[i], Minor);
+        draw_roads_2d(road_types[i], Eigenfield::major());
+        draw_roads_2d(road_types[i], Eigenfield::minor());
     }
 }
