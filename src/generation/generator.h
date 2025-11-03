@@ -7,7 +7,7 @@
 #include <unordered_map>
 
 #include "../types.h"
-#include "integrator.h"
+#include "tensor_field.h"
 #include "road_storage.h"
 
 
@@ -74,12 +74,13 @@ class RoadGenerator : public RoadStorage {
         static constexpr int kQuadTreeLeafCapacity = 10;
 
 
-        std::unique_ptr<NumericalFieldIntegrator> integrator_;
         std::vector<RoadType> road_types_;
         std::unordered_map<RoadType, GeneratorParameters> params_;
         std::array<seed_queue, Eigenfield::count> seeds_;
         std::default_random_engine gen_;
         std::uniform_real_distribution<double> dist_;
+
+        std::shared_ptr<TensorField> field_;
 
         int tangent_samples_ = 5;
         Box<double> viewport_;
@@ -92,11 +93,10 @@ class RoadGenerator : public RoadStorage {
         std::optional<DVector2> get_seed(RoadType road, Eigenfield ef);
 
 
-        void extend_road(
-            Integration& res,
-            const RoadType& road,
-            const Eigenfield& ef
-        ) const;
+        DVector2 get_eigenvector(const DVector2& x, const Eigenfield& ef) const;
+        DVector2 integrate_rk4(const DVector2& x, const Eigenfield& ef, const double& dl) const;
+
+        void extend_road(Integration& res, const RoadType& road, const Eigenfield& ef) const;
 
         std::list<DVector2>
         generate_road(RoadType road, DVector2 seed_point, Eigenfield ef);
@@ -125,7 +125,7 @@ class RoadGenerator : public RoadStorage {
 
     public:
         RoadGenerator(
-                std::unique_ptr<NumericalFieldIntegrator>& integrator,
+                std::shared_ptr<TensorField> field,
                 std::unordered_map<RoadType, GeneratorParameters>,
                 Box<double> viewport
             );

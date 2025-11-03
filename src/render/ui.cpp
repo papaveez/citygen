@@ -5,6 +5,7 @@
 #include "renderer.h"
 #include <cmath>
 #include <cstddef>
+#include <functional>
 
 
 bool UI::mouse_in_editor() const {
@@ -20,93 +21,48 @@ void UI::handle_tool_click(Tool t) {
     
     if (t == EnterMap) {
         state_ = Map;
-    } else if (t == RadialBrush) {
+    } else if (t == RadialBrush || t == GridBrush) {
+        auto& handler = t == RadialBrush ? radial_handler_ : grid_handler_;
+        new_basis_field_ = {};
         selected_tool_ = t;
-        brush_handler_ = [this]() {handle_radial_brush();};
-    } else if (t == GridBrush) {
-        selected_tool_ = t;
-        brush_handler_ = [this]() {handle_grid_brush();};
+        brush_handler_ = std::bind(
+            [this](const BrushHandler& bh) {
+                return handle_brush(bh);
+            }, 
+            handler
+        );
     } else if (t == Generate) {
-        generator_ptr_->reset(ctx_.viewport);
-        generator_ptr_->generate();
+        generator.reset(ctx_.viewport);
+        generator.generate();
     } else if (t == BackToEditor) {
         state_ = FieldEditor;
     }
 }
 
-void UI::handle_radial_brush() {
-    if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
-        if (!mouse_in_editor()) {
-            radial_edit_.initialised = false;
+
+void UI::handle_brush(const BrushHandler& handler) {
+    bool mouse = IsMouseButtonDown(MOUSE_RIGHT_BUTTON);
+    if (!new_basis_field_.has_value()) {
+        if (!(mouse && mouse_in_editor()))
             return;
-        }
+        new_basis_field_ = handler.spawn();
+    }
 
-        if (!radial_edit_.initialised)  {
-            radial_edit_.initialised = true;
-            radial_edit_.centre = ctx_.mouse_world_pos;
-        }
+    int idx = new_basis_field_.value();
 
-        DVector2 diff = radial_edit_.centre - ctx_.mouse_world_pos;
-        radial_edit_.radius = std::hypot(diff.x, diff.y);
-
-        DrawCircleLinesV(
-            GetWorldToScreen2D(radial_edit_.centre, ctx_.camera),
-            radial_edit_.radius*ctx_.camera.zoom, 
-            RED
-        );
-
-    } else if (radial_edit_.initialised && mouse_in_editor()) {
-        tf_ptr_->add_radial(Radial(
-            radial_edit_.centre,
-            radial_edit_.radius,
-            radial_edit_.decay
-        ));
-        radial_edit_.initialised = false;
+    if (!mouse_in_editor()) {
+        handler.cancel(idx);
+    } else if (mouse) {
+        handler.edit(idx);
     } else {
-        radial_edit_.initialised = false;
+        new_basis_field_ = {};
     }
 }
 
-
-void UI::handle_grid_brush() {
-    if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
-        if (!mouse_in_editor()) {
-            grid_edit_.initialised = false;
-            return;
-        }
-        
-        if (!grid_edit_.initialised) {
-            grid_edit_.initialised = true;
-            grid_edit_.centre = ctx_.mouse_world_pos;
-        }
-
-        DVector2 diff = ctx_.mouse_world_pos - grid_edit_.centre;
-        grid_edit_.radius = std::hypot(diff.x, diff.y);
-        grid_edit_.angle = vector_angle({1,0}, diff);
-
-
-        Vector2 screen_centre = GetWorldToScreen2D(grid_edit_.centre, ctx_.camera);
-
-        DrawCircleLinesV(screen_centre, grid_edit_.radius*ctx_.camera.zoom, RED);
-        DrawLineV(screen_centre, GetMousePosition(), RED);
-
-    } else if (grid_edit_.initialised && mouse_in_editor()) {
-        tf_ptr_->add_grid(Grid(
-            grid_edit_.angle,
-            grid_edit_.centre,
-            grid_edit_.radius,
-            grid_edit_.decay
-        ));
-        grid_edit_.initialised = false;
-    } else {
-        grid_edit_.initialised = false;
-    }
-}
 
 
 void UI::reset_tensorfield() {
     tf_ptr_->clear();
-
     tf_ptr_->add_grid(Grid(0, DVector2{0,0}));
 }
 
@@ -129,7 +85,7 @@ void UI::render_toolbar() {
 
     int i=0;
 
-    for (Tool t : tools_[state_]) {
+    for (Tool t : tools[state_]) {
         Rectangle button = button_template;
         button.y = static_cast<float>(
             uiConfig.icon_y_offset + i*(uiConfig.icon_size + uiConfig.icon_padding)
@@ -168,22 +124,22 @@ void UI::render_field_artifacts() {
     bool mouse_down = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
     bool mouse_click = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
 
-    for (size_t i=0;i<tf_ptr_->basis_fields.size(); i++) {
-        auto& [field_type, field] = tf_ptr_->basis_fields[i];
+    for (size_t i=0;i<tf_ptr_->size(); i++) {
+        double size = tf_ptr_->get_size(i);
+        DVector2 centre = tf_ptr_->get_centre(i);
 
         bool is_dragged = dragged_basis_field_.value_or(-1) == i;
         bool is_selected = selected_basis_field_.value_or(-1) == i;
 
         // draw bounding circle
-        if (field->get_size()) {
+        if (size) {
             DrawCircleLinesV(
-                GetWorldToScreen2D(field->get_centre(), ctx_.camera),
-                field->get_size()*ctx_.camera.zoom,
+                GetWorldToScreen2D(centre, ctx_.camera),
+                size*ctx_.camera.zoom,
                 BLACK
             );
         }
 
-        DVector2 centre = field->get_centre();
 
         
         DrawCircleV(
@@ -207,7 +163,7 @@ void UI::render_field_artifacts() {
 
         if (is_dragged && mouse_down) {
             ctx_.camera_locked |= true;
-            field->set_centre(ctx_.mouse_world_pos);
+            tf_ptr_->set_centre(i, ctx_.mouse_world_pos);
         } else if (is_dragged) {
             dragged_basis_field_ = {}; // unset dragged field
         }
@@ -227,7 +183,6 @@ void UI::render_editor_pane() {
     assert(selected_basis_field_.has_value());
 
     size_t basis_id = selected_basis_field_.value();
-    auto& [field_type, field] = tf_ptr_->basis_fields[basis_id];
 
     DrawRectangleV(
         editor_pane_bbox_.min,
@@ -252,18 +207,18 @@ void UI::render_editor_pane() {
     // TODO: not using external font
     DrawTextEx(
         fonts.normal,
-        TextFormat("Field <ID #%i> : %s", basis_id, basis_field_string(field_type)),
+        TextFormat("Field <ID #%i> : %s", basis_id, " Either Radial | Grid"),
         editor_pane_bbox_.min,
         0.8*static_cast<float>(fonts.normal.baseSize),
         2,
         BLACK
     );
 
-    switch (field_type) {
-        case BasisFieldType::Grid:
-            draw_grid_properties(basis_id);
-        case BasisFieldType::Radial:
-            draw_radial_properties(basis_id);
+
+    if (tf_ptr_->is<Grid>(basis_id)) {
+        draw_grid_properties(basis_id);
+    } else if (tf_ptr_->is<Radial>(basis_id)) {
+        draw_radial_properties(basis_id);
     }
 }
 
@@ -278,8 +233,8 @@ void UI::draw_radial_properties(size_t field_id) {
 }
 
 
-UI::UI(RenderContext& ctx, TensorField* tf_ptr, RoadGenerator* gen_ptr) 
-    : Renderer(ctx, tf_ptr, gen_ptr) 
+UI::UI(RenderContext& ctx) 
+    : Renderer(ctx) 
 {
     reset_tensorfield();
 }
@@ -332,8 +287,12 @@ void UI::main_loop() {
         } ctx_.end_mode_2d();
 
         render_toolbar();
-        if (brush_handler_.has_value()) 
+        // handle brush
+        //
+        if (brush_handler_.has_value()) {
             brush_handler_.value()();
+        }
+
 
         DrawFPS(0, 0);
     } ctx_.end_drawing();

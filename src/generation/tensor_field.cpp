@@ -1,5 +1,5 @@
 #include "tensor_field.h"
-#include <memory>
+#include <cstddef>
 
 
 // ****** Tensor ******
@@ -203,22 +203,92 @@ Tensor Radial::get_tensor(const DVector2& pos) const {
 }
 
 
-// ****** BasisFieldType ******
-
-const char* basis_field_string(BasisFieldType t) {
-    switch (t) {
-        case BasisFieldType::Radial:
-            return "Radial";
-        case BasisFieldType::Grid:
-            return "Grid";
-    }
-}
-
-
 // ****** TensorField ******
 
 
 TensorField::TensorField() {}
+
+
+
+void TensorField::add_grid(Grid&& grid) {
+    basis_fields.push_back(std::move(grid));
+}
+
+
+void TensorField::add_radial(Radial&& radial) {
+    basis_fields.push_back(std::move(radial));
+}
+
+const DVector2& TensorField::get_centre(size_t idx) const {
+    return std::visit([](const auto& f) -> const DVector2& {
+            return f.get_centre();
+        },
+        basis_fields[idx]
+    );
+}
+
+const double& TensorField::get_size(size_t idx) const {
+    return std::visit([](const auto& f) -> const double& {
+            return f.get_size();
+        },
+        basis_fields[idx]
+    );
+}
+
+const double& TensorField::get_decay(size_t idx) const {
+    return std::visit([](const auto& f) -> const double& {
+            return f.get_decay();
+        },
+        basis_fields[idx]
+    );
+}
+
+
+void TensorField::set_centre(size_t idx, DVector2 centre) {
+    std::visit([&centre](auto& f) {
+            f.set_centre(centre);
+        },
+        basis_fields[idx]
+    );
+}
+
+
+void TensorField::set_size(size_t idx, double size) {
+    std::visit([&size](auto& f) {
+            f.set_size(size);
+        }, 
+        basis_fields[idx]
+    );
+}
+
+
+void TensorField::set_decay(size_t idx, double decay) {
+    std::visit([&decay](auto& f) {
+            f.set_decay(decay);
+        },
+        basis_fields[idx]
+    );
+}
+
+
+void TensorField::erase(size_t idx) {
+    basis_fields.erase(basis_fields.begin() + idx);
+}
+
+
+Tensor TensorField::sample(const DVector2& pos) const {
+    Tensor total;
+
+    for (auto& x : basis_fields) {
+        std::visit([&total, &pos](const auto& f) {
+            total = total + f.get_weighted_tensor(pos);
+        }, x);
+    }
+
+    total.set_r_theta();
+
+    return total;
+}
 
 
 size_t TensorField::size() const {
@@ -226,45 +296,8 @@ size_t TensorField::size() const {
 }
 
 
-void TensorField::add_grid(Grid&& grid) {
-    basis_fields.push_back({
-        BasisFieldType::Grid,
-        std::make_unique<Grid>(std::move(grid))
-    });
-}
-
-
-void TensorField::add_radial(Radial&& radial) {
-    basis_fields.push_back({
-        BasisFieldType::Radial,
-        std::make_unique<Radial>(std::move(radial))
-    });
-}
-
 void TensorField::clear() {
     basis_fields.clear();
 }
 
 
-Tensor TensorField::sample(const DVector2& pos) const {
-    Tensor out; // new degenerate tensor
-
-    for (auto& [_, x] : basis_fields) {
-        Tensor basis_field_tensor = x->get_weighted_tensor(pos);
-        out = out + basis_field_tensor;
-    }
-
-    out.set_r_theta();
-
-    return out;
-}
-
-
-std::vector<DVector2> TensorField::get_basis_centres() const {
-    std::vector<DVector2> out;
-    for (auto& [_, x] : basis_fields) {
-        out.push_back(x->get_centre());
-    }
-
-    return out;
-}

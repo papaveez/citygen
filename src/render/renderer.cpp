@@ -30,7 +30,7 @@ Renderer::draw_vector_line(const Vector2& vec, const Vector2& world_pos,
 void Renderer::draw_roads_2d(RoadType road_type, Eigenfield eigenfield) const {
     const RoadStyle& style = road_styles_.at(road_type);
 
-    std::uint32_t num_roads = generator_ptr_->road_count(road_type, eigenfield);
+    std::uint32_t num_roads = generator.road_count(road_type, eigenfield);
 
     for (std::uint32_t idx=0; idx<num_roads; ++idx) {
         RoadHandle handle = {
@@ -39,7 +39,7 @@ void Renderer::draw_roads_2d(RoadType road_type, Eigenfield eigenfield) const {
             eigenfield
         };
 
-        auto [len, data] = generator_ptr_->get_road_points(handle);
+        auto [len, data] = generator.get_road_points(handle);
 
         // draw road outline
         DrawSplineLinear(
@@ -71,10 +71,10 @@ void Renderer::draw_roads_2d(RoadType road_type, Eigenfield eigenfield) const {
     }
 }
 
-Renderer::Renderer(RenderContext& ctx, TensorField* tf_ptr, RoadGenerator* gen_ptr) :
+Renderer::Renderer(RenderContext& ctx) :
     ctx_(ctx),
-    tf_ptr_(tf_ptr),
-    generator_ptr_(gen_ptr)
+    tf_ptr_(std::make_shared<TensorField>()),
+    generator(RoadGenerator(tf_ptr_, params, ctx_.viewport))
 {}
 
 
@@ -114,7 +114,7 @@ void Renderer::render_map_2d() const {
     assert(ctx_.state == RenderState::Mode2D);
 
     const std::vector<RoadType>& road_types = 
-        generator_ptr_->get_road_types();
+        generator.get_road_types();
 
     for (int i=road_types.size()-1; i>=0; --i) {
         draw_roads_2d(road_types[i], Eigenfield::major());

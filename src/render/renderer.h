@@ -5,6 +5,7 @@
 
 #include "../generation/generator.h"
 #include "config.h"
+#include <memory>
 
 enum class RenderState {
     None,
@@ -86,10 +87,10 @@ private:
 
 protected:
     RenderContext& ctx_;
-    TensorField*   tf_ptr_;
-    RoadGenerator* generator_ptr_;
+    std::shared_ptr<TensorField> tf_ptr_;
+    RoadGenerator generator;
 
-    Renderer(RenderContext& ctx, TensorField* tf_ptr, RoadGenerator* gen_ptr);
+    Renderer(RenderContext& ctx);
 
     std::unordered_map<RoadType, RoadStyle> road_styles_ 
         = default_road_styles;

@@ -8,12 +8,60 @@
 #include <list>
 #include <vector>
 
-#include "integrator.h"
 #include "../types.h"
 
 
 using qnode_id = std::uint32_t;                
 constexpr qnode_id NullQNode = -1;
+
+using ef_mask = unsigned char;
+
+struct Eigenfield {
+    enum class EigenDirection : size_t {
+        Minor,
+        Major,
+        Count
+    };
+
+    EigenDirection value;
+
+    constexpr Eigenfield(EigenDirection v) : value(v) {}
+
+
+    static constexpr Eigenfield major() {
+        return Eigenfield(EigenDirection::Major);
+    };
+
+    static constexpr Eigenfield minor(){
+        return Eigenfield(EigenDirection::Minor);
+    }
+
+    static constexpr size_t count = static_cast<size_t>(EigenDirection::Count);
+
+    constexpr Eigenfield opposite() {
+        if (value == EigenDirection::Major) {
+            return minor();
+        } else {
+            return major();
+        }
+    }
+
+
+    constexpr operator size_t() const {return static_cast<size_t>(value);}
+    constexpr operator ef_mask() const {return 1<<size_t(value);}
+    constexpr ef_mask mask() const {return 1<<size_t(value);}
+
+
+    constexpr bool operator == (const Eigenfield& other) const {
+        return value == other.value;
+    }
+
+
+    constexpr ef_mask operator | (const Eigenfield& other) const {
+        return static_cast<ef_mask>(other) | static_cast<ef_mask>(*this);
+    }
+};
+
 
 
 enum RoadType : size_t {

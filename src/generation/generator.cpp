@@ -1,5 +1,4 @@
 #include "generator.h"
-#include "integrator.h"
 
 GeneratorParameters::GeneratorParameters(
         int max_seed_retries,
@@ -71,6 +70,31 @@ RoadGenerator::get_seed(RoadType road, Eigenfield ef) {
     return {};
 }
 
+DVector2 RoadGenerator::get_eigenvector(const DVector2& x,
+    const Eigenfield& ef) const 
+{
+    Tensor out = field_->sample(x);
+
+    if (ef == Eigenfield::major()) {
+        return out.get_major_eigenvector();
+    } else {
+        return out.get_minor_eigenvector();
+    }
+}
+
+DVector2 RoadGenerator::integrate_rk4(const DVector2& x,
+    const Eigenfield& ef, const double& dl) const 
+{
+    DVector2 dx = {dl, dl};
+
+    DVector2 k1 = get_eigenvector(x, ef);
+    DVector2 k2 = get_eigenvector(x + dx/2.0, ef);
+    DVector2 k4 = get_eigenvector(x + dx, ef);
+
+    return k1 + k2*4.0 + k4/6.0;
+}
+
+
 
 void RoadGenerator::extend_road(
     Integration& res,
@@ -82,7 +106,7 @@ void RoadGenerator::extend_road(
         return;
     };
 
-    DVector2 delta = integrator_->integrate(
+    DVector2 delta = integrate_rk4(
         res.integration_front, 
         ef, 
         params_.at(road).dl
@@ -391,12 +415,12 @@ void RoadGenerator::connect_roads(RoadType road_type, Eigenfield ef) {
 
 
 RoadGenerator::RoadGenerator(
-    std::unique_ptr<NumericalFieldIntegrator>& integrator,
+    std::shared_ptr<TensorField> field,
     std::unordered_map<RoadType, GeneratorParameters> parameters,
     Box<double> viewport
 ) :
     viewport_(viewport),
-    integrator_(std::move(integrator)),
+    field_(std::move(field)),
     params_(parameters),
     dist_(0.0, 1.0),
     RoadStorage(viewport, kQuadTreeDepth, kQuadTreeLeafCapacity)

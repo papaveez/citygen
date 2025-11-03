@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <limits>
 
 #include "../types.h"
@@ -89,28 +90,61 @@ class Radial : public BasisField {
 };
 
 
-enum class BasisFieldType {
-    Grid,
-    Radial
-};
+class TensorField {
+private:
+    std::vector<std::variant<Grid, Radial>> basis_fields;
 
-
-const char* basis_field_string(BasisFieldType t);
-
-
-struct TensorField {
-    std::vector<std::pair<BasisFieldType, std::unique_ptr<BasisField>>> basis_fields;
-
+public:
     TensorField();
-    size_t size() const;
-
-    void clear();
 
     void add_grid(Grid&& grid);
     void add_radial(Radial&& radial);
 
+    const DVector2& get_centre(size_t idx) const;
+    const double& get_size(size_t idx) const;
+    const double& get_decay(size_t idx) const;
+
+
+    void set_centre(size_t idx, DVector2 centre);
+    void set_size(size_t idx, double size);
+    void set_decay(size_t idx, double decay);
+
+    void erase(size_t idx);
+
+    template<typename V>
+    bool is(size_t idx) const
+    {
+        if (idx >= basis_fields.size()) return false;
+
+        if (const V* ptr = std::get_if<V>(&basis_fields[idx])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    template<typename V, typename Func>
+    void visit_if(size_t idx, Func&& func)
+    {
+        if (idx >= basis_fields.size())
+            return;
+
+        if (V* ptr = std::get_if<V>(&basis_fields[idx]))
+            std::invoke(std::forward<Func>(func), *ptr);
+    }
+
+
+    template<typename V, typename Func>
+    void visit_if(size_t idx, Func&& func) const
+    {
+        if (idx >= basis_fields.size())
+            return;
+
+        if (const V* ptr = std::get_if<V>(&basis_fields[idx]))
+            std::invoke(std::forward<Func>(func), *ptr);
+    }
+
     Tensor sample(const DVector2& pos) const;
-    std::vector<DVector2> get_basis_centres() const;
+    size_t size() const;
+    void clear();
 };
-
-

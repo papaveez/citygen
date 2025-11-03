@@ -25,6 +25,10 @@ struct TVector2 {
         };
     }
 
+    double mag() const {
+        return std::hypot(x, y);
+    }
+
     bool operator==(const TVector2<T>& other) const {
         return x == other.x && y == other.y;
     }
