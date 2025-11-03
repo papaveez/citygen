@@ -2,6 +2,7 @@
 #include "config.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "renderer.h"
 #include <cmath>
 #include <cstddef>
 
@@ -111,8 +112,7 @@ void UI::reset_tensorfield() {
 
 
 void UI::render_toolbar() {
-    assert(ctx_.is_drawing);
-    assert(!ctx_.is_2d_mode);
+    assert(ctx_.state == RenderState::Drawing);
 
     DrawRectangleV(
         toolbar_bbox_.min,
@@ -161,8 +161,7 @@ void UI::render_toolbar() {
 
 
 void UI::render_field_artifacts() {
-    assert(ctx_.is_drawing);
-    assert(!ctx_.is_2d_mode);
+    assert(ctx_.state == RenderState::Drawing);
 
     ctx_.camera_locked = false;
 
@@ -223,8 +222,8 @@ void UI::render_field_artifacts() {
 
 
 void UI::render_editor_pane() {
-    assert(ctx_.is_drawing);
-    assert(!ctx_.is_2d_mode);
+    assert(ctx_.state == RenderState::Drawing);
+
     assert(selected_basis_field_.has_value());
 
     size_t basis_id = selected_basis_field_.value();
@@ -318,9 +317,7 @@ void UI::main_loop() {
     }
 
     
-    BeginDrawing(); ctx_.is_drawing = true; {
-        assert(ctx_.is_drawing);
-
+    ctx_.begin_drawing(); {
         ClearBackground(RAYWHITE);
         if (state_ == FieldEditor) {
             render_tensorfield();
@@ -330,16 +327,14 @@ void UI::main_loop() {
             }
         }
 
-        BeginMode2D(ctx_.camera); ctx_.is_2d_mode = true; {
+        ctx_.begin_mode_2d(); {
             if (state_ == Map) render_map_2d();
-
-        } EndMode2D(); ctx_.is_2d_mode = false;
+        } ctx_.end_mode_2d();
 
         render_toolbar();
         if (brush_handler_.has_value()) 
             brush_handler_.value()();
 
         DrawFPS(0, 0);
-
-    } EndDrawing(); ctx_.is_drawing = false;
+    } ctx_.end_drawing();
 }

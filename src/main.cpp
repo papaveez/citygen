@@ -27,7 +27,7 @@ static std::unordered_map<RoadType, GeneratorParameters> params = {
 
 int main(int argc, char** argv)
 {
-    RenderContext ctx(SCREEN_WIDTH, SCREEN_HEIGHT);
+    RenderContext ctx(SCREEN_WIDTH, SCREEN_HEIGHT, "MapGen");
 
     TensorField tf;
     std::unique_ptr<NumericalFieldIntegrator> itg = std::make_unique<RK4>(&tf);
@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 
     UI ui(ctx, &tf, &generator);
 
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "MapGen"); ctx.is_window = true; {
+    ctx.init_window(); {
         ctx.camera.zoom = 1.0f;
 
         SetTargetFPS(60);
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
         {
             ui.main_loop();
         }
-    } CloseWindow(); ctx.is_window = false;
+    } ctx.close_window();
     
 
     return 0;

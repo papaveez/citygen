@@ -4,6 +4,9 @@
 #include "raylib.h"
 #include "raymath.h"
 
+
+// #define DRAW_NODES
+
 void 
 Renderer::draw_vector_line(const Vector2& vec, const Vector2& world_pos,
     Color col) const
@@ -55,14 +58,16 @@ void Renderer::draw_roads_2d(RoadType road_type, Eigenfield eigenfield) const {
             style.col
         );
 
-        // Color col = eigenfield == Major ? renderConfig.major_col 
-        //                                 : renderConfig.minor_col;
-        // for (int i=0; i<len; ++i) {
-        //     DrawCircleV(data[i], 1, col);
-        //     if (i>0) {
-        //         DrawLineV(data[i-1], data[i], col);
-        //     }
-        // }
+#ifdef DRAW_NODES
+        Color col = eigenfield == Eigenfield::major() ? renderConfig.major_col 
+                                                      : renderConfig.minor_col;
+        for (int i=0; i<len; ++i) {
+            DrawCircleV(data[i], 1, col);
+            if (i>0) {
+                DrawLineV(data[i-1], data[i], col);
+            }
+        }
+#endif
     }
 }
 
@@ -74,9 +79,7 @@ Renderer::Renderer(RenderContext& ctx, TensorField* tf_ptr, RoadGenerator* gen_p
 
 
 void Renderer::render_tensorfield() const {
-    assert(ctx_.is_window);
-    assert(ctx_.is_drawing);
-    assert(!ctx_.is_2d_mode);
+    assert(ctx_.state == RenderState::Drawing);
 
     const float& granularity = renderConfig.field_granularity;
 
@@ -108,8 +111,7 @@ void Renderer::render_tensorfield() const {
 
 
 void Renderer::render_map_2d() const {
-    assert(ctx_.is_drawing);
-    assert(ctx_.is_2d_mode);
+    assert(ctx_.state == RenderState::Mode2D);
 
     const std::vector<RoadType>& road_types = 
         generator_ptr_->get_road_types();

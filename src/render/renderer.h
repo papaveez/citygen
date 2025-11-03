@@ -6,12 +6,19 @@
 #include "../generation/generator.h"
 #include "config.h"
 
+enum class RenderState {
+    None,
+    Window,
+    Drawing,
+    Mode2D
+};
+
 struct RenderContext {
     int width, height;
+    const char* window_title;
+
     Camera2D camera = {0};
-    bool is_window = false;
-    bool is_drawing = false;
-    bool is_2d_mode = false;
+    RenderState state = RenderState::None;
     bool camera_locked = false;
     DVector2 mouse_world_pos = {0.0, 0.0};
     Box<double> viewport = Box(
@@ -22,8 +29,48 @@ struct RenderContext {
         }
     );
 
+    RenderContext(int w, int h, const char* title) :
+        width(w),
+        height(h),
+        window_title(title)
+    {}
 
-    RenderContext(int w, int h) : width(w), height(h) {}
+    void init_window() {
+        assert(state == RenderState::None);
+
+        InitWindow(width, height, window_title);
+        state = RenderState::Window;
+    }
+
+    void close_window() {
+        assert (state == RenderState::Window);
+        CloseWindow();
+        state = RenderState::None;
+    }
+
+    void begin_drawing() {
+        assert(state == RenderState::Window);
+        BeginDrawing();
+        state = RenderState::Drawing;
+    }
+
+    void end_drawing() {
+        assert(state == RenderState::Drawing);
+        EndDrawing();
+        state = RenderState::Window;
+    }
+
+    void begin_mode_2d () {
+        assert(state == RenderState::Drawing);
+        BeginMode2D(camera);
+        state = RenderState::Mode2D;
+    }
+
+    void end_mode_2d() {
+        assert(state == RenderState::Mode2D);
+        EndMode2D();
+        state = RenderState::Drawing;
+    }
 };
 
 
