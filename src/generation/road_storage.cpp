@@ -216,12 +216,15 @@ RoadStorage::gather_data_rec(const qnode_id& head_ptr, BBoxQuery& query) const {
 RoadStorage::RoadStorage(
     Box<double> viewport,
     int depth,
-    int leaf_capacity
+    int leaf_capacity,
+    size_t road_type_count
 ) :
     viewport_(viewport),
     max_depth_(depth),
-    leaf_capacity_(leaf_capacity) 
+    leaf_capacity_(leaf_capacity),
+    road_type_count_(road_type_count)
 {
+    roads_.resize(road_type_count);
     reset_storage(viewport);
 }
 
@@ -255,7 +258,7 @@ void RoadStorage::reset_storage(Box<double> new_viewport) {
     nodes_.clear();
     fnodes_.clear();
 
-    for (int i=0; i< RoadTypeCount; ++i) {
+    for (int i=0; i< road_type_count_; ++i) {
         for (int j=0; j < Eigenfield::count; ++j) {
             roads_[i][j].clear();
         }
@@ -264,7 +267,7 @@ void RoadStorage::reset_storage(Box<double> new_viewport) {
 
 
 void RoadStorage::insert(const std::list<DVector2>& points,
-    RoadType road_type, Eigenfield eigenfield, bool is_join) {
+    size_t road_type, Eigenfield eigenfield, bool is_join) {
     if (points.size() == 0) return;
 
     std::list<NodeHandle> node_handles;
@@ -315,7 +318,7 @@ RoadStorage::get_road_points(const RoadHandle& road_handle) const {
 }
 
 
-std::uint32_t RoadStorage::road_count(RoadType road_type, Eigenfield eigenfield) const {
+std::uint32_t RoadStorage::road_count(size_t road_type, Eigenfield eigenfield) const {
     return roads_[road_type][eigenfield].size();
 }
 

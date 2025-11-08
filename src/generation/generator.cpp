@@ -1,4 +1,5 @@
 #include "generator.h"
+#include <iostream>
 
 GeneratorParameters::GeneratorParameters(
         int max_seed_retries,
@@ -43,29 +44,32 @@ void RoadGenerator::add_candidate_seed(DVector2 pos, Eigenfield ef) {
 
 
 std::optional<DVector2> 
-RoadGenerator::get_seed(RoadType road, Eigenfield ef) {
+RoadGenerator::get_seed(size_t road, Eigenfield ef) {
     seed_queue& candidate_queue = seeds_[ef];
+
+    const GeneratorParameters& param = params_[road];
+
 
     DVector2 seed;
     while (!candidate_queue.empty()) {
         DVector2 seed = candidate_queue.front();
         candidate_queue.pop();
-        if (!has_nearby_point(seed, params_.at(road).d_sep, ef)) {
+        if (!has_nearby_point(seed, param.d_sep, ef)) {
             return seed;
         } 
     }
 
 
-    for (int count=0; count<params_.at(road).max_seed_retries; count++) {
+    for (int count=0; count<param.max_seed_retries; count++) {
         seed = DVector2 {
             dist_(gen_)*viewport_.width()  + viewport_.min.x,
             dist_(gen_)*viewport_.height() + viewport_.min.y
         };
 
 
-        if (!has_nearby_point(seed, params_.at(road).d_sep, ef)) {
+        if (!has_nearby_point(seed, param.d_sep, ef)) {
             return seed;
-        } 
+        }
     }
     return {};
 }
@@ -98,7 +102,7 @@ DVector2 RoadGenerator::integrate_rk4(const DVector2& x,
 
 void RoadGenerator::extend_road(
     Integration& res,
-    const RoadType& road, 
+    const size_t& road, 
     const Eigenfield& ef 
 ) const {
     if (res.status != Continue) {
@@ -109,7 +113,7 @@ void RoadGenerator::extend_road(
     DVector2 delta = integrate_rk4(
         res.integration_front, 
         ef, 
-        params_.at(road).dl
+        params_[road].dl
     );
 
     if (res.negate) 
@@ -132,14 +136,14 @@ void RoadGenerator::extend_road(
     }
 
     res.status = Continue;
-    if (has_nearby_point(res.integration_front, params_.at(road).d_test, ef)) {
+    if (has_nearby_point(res.integration_front, params_[road].d_test, ef)) {
         res.status = Terminate;
     }
 }
 
 
 std::list<DVector2>
-RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) {
+RoadGenerator::spawn_road(size_t road, DVector2 seed_point, Eigenfield ef) {
     Integration forward  (seed_point, false);
     Integration backward (seed_point, true );
 
@@ -149,7 +153,9 @@ RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) 
 
     int count = 0;
 
-    while(count<params_.at(road).max_integration_iterations) {
+    const auto& max_iter = params_[road].max_integration_iterations;
+
+    while(count<max_iter) {
         extend_road(forward,  road, ef);
         extend_road(backward, road, ef);
 
@@ -170,10 +176,10 @@ RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) 
         DVector2 ends_diff = forward.points.back() - backward.points.front();
         double sep2 = dot_product(ends_diff, ends_diff);
 
-        if (points_diverged && sep2 < params_.at(road).d_circle2) {
+        if (points_diverged && sep2 < params_[road].d_circle2) {
             join = true;
             break;
-        } else if (!points_diverged && sep2 > params_.at(road).d_circle2) {
+        } else if (!points_diverged && sep2 > params_[road].d_circle2) {
             points_diverged = true;
         }
     }
@@ -193,15 +199,17 @@ RoadGenerator::generate_road(RoadType road, DVector2 seed_point, Eigenfield ef) 
 }
 
 
-int RoadGenerator::generate_all_roads(RoadType road_type) {
+int RoadGenerator::generate_roads(size_t road_type) {
     Eigenfield ef = Eigenfield::major();
 
     std::optional<DVector2> seed = get_seed(road_type, ef);
     int k = 0;
     while (seed.has_value()) {
-        std::list<DVector2> streamline = generate_road(road_type, seed.value(), ef);
+        std::cout << "Seed: " << seed.value() << std::endl;
+        std::list<DVector2> streamline = spawn_road(road_type, seed.value(), ef);
 
         simplify_streamline(road_type, streamline);
+
 
         if (streamline.size() >= tangent_samples_) { 
             push_road(streamline, road_type, ef);
@@ -221,9 +229,9 @@ int RoadGenerator::generate_all_roads(RoadType road_type) {
 }
 
 
-void RoadGenerator::simplify_streamline(RoadType road, std::list<DVector2>& points) const {
-    assert(params_.at(road).epsilon > 0.0);
-    douglas_peucker(params_.at(road).epsilon, params_.at(road).node_sep2, points, points.begin(), points.end());
+void RoadGenerator::simplify_streamline(size_t road, std::list<DVector2>& points) const {
+    assert(params_[road].epsilon > 0.0);
+    douglas_peucker(params_[road].epsilon, params_[road].node_sep2, points, points.begin(), points.end());
 }
 
 
@@ -273,7 +281,7 @@ void RoadGenerator::douglas_peucker(const double& epsilon, const double& min_sep
 }
 
 
-void RoadGenerator::push_road(std::list<DVector2>& points, RoadType road, Eigenfield ef) {
+void RoadGenerator::push_road(std::list<DVector2>& points, size_t road, Eigenfield ef) {
     if (points.front() != points.back()) {
         add_candidate_seed(points.front(), ef.opposite());
         add_candidate_seed(points.back(), ef.opposite());
@@ -307,11 +315,11 @@ RoadGenerator::joining_candidate(const NodeHandle& handle) const {
 
     std::list<NodeHandle> nearby = nearby_points(
         get_pos(handle), 
-        params_.at(road_handle.road_type).d_lookahead,
+        params_[road_handle.road_type].d_lookahead,
         Eigenfield::major() | Eigenfield::minor()
     );
 
-    double theta_max = params_.at(road_handle.road_type).theta_max;
+    double theta_max = params_[road_handle.road_type].theta_max;
     DVector2 pos = get_pos(handle);
     DVector2 local_dir = tangent(handle);
 
@@ -371,7 +379,7 @@ RoadGenerator::joining_streamline(double dl, DVector2 x0, DVector2 x1) const {
 }
 
 
-void RoadGenerator::connect_roads(RoadType road_type, Eigenfield ef) {
+void RoadGenerator::connect_roads(size_t road_type, Eigenfield ef) {
     RoadHandle road_handle {
         0,
         road_type,
@@ -380,7 +388,7 @@ void RoadGenerator::connect_roads(RoadType road_type, Eigenfield ef) {
 
     std::uint32_t count = road_count(road_type, ef);
 
-    double dl = params_.at(road_type).node_sep;
+    double dl = params_[road_type].node_sep;
 
     for (std::uint32_t idx = 0; idx < count; ++idx) {
         road_handle.idx = idx;
@@ -390,7 +398,7 @@ void RoadGenerator::connect_roads(RoadType road_type, Eigenfield ef) {
         NodeHandle last  = { road.end-1,   road_handle };
 
         std::optional<NodeHandle> first_join = joining_candidate(first);
-        std::optional<NodeHandle> last_join = joining_candidate(last);
+        std::optional<NodeHandle> last_join  = joining_candidate(last);
 
         if (first_join.has_value()) {
             std::list<DVector2> s_join = joining_streamline(
@@ -415,38 +423,28 @@ void RoadGenerator::connect_roads(RoadType road_type, Eigenfield ef) {
 
 
 RoadGenerator::RoadGenerator(
-    std::shared_ptr<TensorField> field,
-    std::unordered_map<RoadType, GeneratorParameters> parameters,
+    TensorField* field,
+    size_t road_type_count,
+    GeneratorParameters* parameters,
     Box<double> viewport
 ) :
     viewport_(viewport),
-    field_(std::move(field)),
-    params_(parameters),
+    field_(field),
     dist_(0.0, 1.0),
-    RoadStorage(viewport, kQuadTreeDepth, kQuadTreeLeafCapacity)
+    RoadStorage(viewport, kQuadTreeDepth, kQuadTreeLeafCapacity, road_type_count),
+    params_(parameters)
 {
-    road_types_.reserve(parameters.size());
 
-    for (auto& [key, params] : params_) {
-        params.d_test = std::min(params.d_test, params.d_sep);
-        road_types_.push_back(key);
+    for (int i=0; i<road_type_count; ++i) {
+        GeneratorParameters& p = params_[i];
+        p.d_test = std::min(p.d_test, p.d_sep);
     }
 }
 
 
-const std::vector<RoadType>&
-RoadGenerator::get_road_types() const {
-    return road_types_;
+size_t RoadGenerator::road_type_count() const {
+    return road_type_count_;
 }
-
-
-const std::unordered_map<RoadType, GeneratorParameters>&
-RoadGenerator::get_parameters() const {
-    return params_;
-}
-
-
-
 
 void RoadGenerator::reset(Box<double> new_viewport) {
     viewport_ = new_viewport;
@@ -466,9 +464,8 @@ void RoadGenerator::clear() {
 void RoadGenerator::generate() {
     clear();
 
-    std::sort(road_types_.begin(), road_types_.end());
 
-    for (auto r : road_types_) {
-        generate_all_roads(r);
+    for (int i=0;i<road_type_count_;++i) {
+        generate_roads(i);
     }
 }

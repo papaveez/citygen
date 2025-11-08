@@ -16,6 +16,7 @@ constexpr qnode_id NullQNode = -1;
 
 using ef_mask = unsigned char;
 
+// this is kept general (for perhaps a 3d expansion);
 struct Eigenfield {
     enum class EigenDirection : size_t {
         Minor,
@@ -26,6 +27,8 @@ struct Eigenfield {
     EigenDirection value;
 
     constexpr Eigenfield(EigenDirection v) : value(v) {}
+    constexpr Eigenfield(size_t i) :
+        value(static_cast<EigenDirection>(i)) {}
 
 
     static constexpr Eigenfield major() {
@@ -64,17 +67,10 @@ struct Eigenfield {
 
 
 
-enum RoadType : size_t {
-    Main,
-    HighStreet,
-    SideStreet,
-    RoadTypeCount
-};
-
 
 struct RoadHandle {
     std::uint32_t idx;
-    RoadType road_type;
+    size_t road_type;
     Eigenfield eigenfield;
 
     bool operator==(const RoadHandle& other) const {
@@ -99,13 +95,9 @@ struct NodeHandle {
 
 struct QuadNode {
     Box<double> bbox;
-
     std::list<NodeHandle> data;
-
     qnode_id children[4] = {NullQNode, NullQNode, NullQNode, NullQNode};
-
-    ef_mask eigenfields; // bit mask saying what direction (Major/Minor) children have
-    
+    ef_mask eigenfields;
     QuadNode(Box<double> bounding_box, ef_mask eigenfields) :
         bbox(bounding_box),
         eigenfields(eigenfields)
@@ -154,8 +146,7 @@ private:
     // node storage
     std::vector<DVector2> nodes_;
     std::vector<Vector2> fnodes_; // quick conversion to float for rendering
-    std::array<std::array<std::vector<Road>, Eigenfield::count>, RoadTypeCount> 
-        roads_;
+    std::vector<std::array<std::vector<Road>, Eigenfield::count>> roads_;
 
     // quadtree
     Box<double> viewport_;
@@ -165,9 +156,9 @@ public:
 #endif
     qnode_id root_;
     std::vector<QuadNode> qnodes_;
-
     int max_depth_;
     int leaf_capacity_;
+
 
 
     std::array<std::pair<ef_mask, std::list<NodeHandle>>, 4> 
@@ -204,10 +195,12 @@ public:
     ) const;
 
 protected:
+    size_t road_type_count_;
     RoadStorage(
         Box<double> viewport,
         int depth,
-        int leaf_capacity
+        int leaf_capacity,
+        size_t road_type_count
     );
 
     const DVector2& get_pos(const NodeHandle& h) const;
@@ -220,7 +213,7 @@ protected:
 
     void insert(
         const std::list<DVector2>& points,
-        RoadType road_type,
+        size_t road_type,
         Eigenfield eigenfield,
         bool is_join = false
     );
@@ -239,7 +232,7 @@ protected:
 
 public:
     std::pair<size_t, const Vector2*> get_road_points(const RoadHandle& road_handle) const;
-    std::uint32_t road_count(RoadType road_type, Eigenfield eigenfield) const;
+    std::uint32_t road_count(size_t road_type, Eigenfield eigenfield) const;
 
 
     bool is_connective_road(const RoadHandle& rh) const;

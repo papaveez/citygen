@@ -1,11 +1,9 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "raylib.h"
-
+#include "styles.h"
 #include "../generation/generator.h"
-#include "config.h"
-#include <memory>
+
 
 enum class RenderState {
     None,
@@ -14,10 +12,11 @@ enum class RenderState {
     Mode2D
 };
 
-struct RenderContext {
-    int width, height;
-    const char* window_title;
 
+struct Renderer {
+    int width, height;
+    Box<float> screen_dims = {Vector2{0, 0}, Vector2{(float)width, (float)height}};
+    const char* window_title;
     Camera2D camera = {0};
     RenderState state = RenderState::None;
     bool camera_locked = false;
@@ -30,74 +29,61 @@ struct RenderContext {
         }
     );
 
-    RenderContext(int w, int h, const char* title) :
-        width(w),
-        height(h),
-        window_title(title)
-    {}
+    Renderer(int w, int h, const char* window_title);
+    ~Renderer();
 
-    void init_window() {
-        assert(state == RenderState::None);
+    void init_window();
+    void close_window();
+    void begin_drawing();
+    void end_drawing();
+    void begin_mode_2d ();
+    void end_mode_2d();
 
-        InitWindow(width, height, window_title);
-        state = RenderState::Window;
-    }
 
-    void close_window() {
-        assert (state == RenderState::Window);
-        CloseWindow();
-        state = RenderState::None;
-    }
-
-    void begin_drawing() {
-        assert(state == RenderState::Window);
-        BeginDrawing();
-        state = RenderState::Drawing;
-    }
-
-    void end_drawing() {
-        assert(state == RenderState::Drawing);
-        EndDrawing();
-        state = RenderState::Window;
-    }
-
-    void begin_mode_2d () {
-        assert(state == RenderState::Drawing);
-        BeginMode2D(camera);
-        state = RenderState::Mode2D;
-    }
-
-    void end_mode_2d() {
-        assert(state == RenderState::Mode2D);
-        EndMode2D();
-        state = RenderState::Drawing;
-    }
+    void main_loop();
 };
 
 
-class Renderer {
-private:
-    void draw_vector_line(
-        const Vector2& vec,
-        const Vector2& world_pos,
-        Color col
-    ) const;
-
-    void draw_roads_2d(RoadType road_type, Eigenfield eigenfield) const;
-
+class Component {
 protected:
-    RenderContext& ctx_;
-    std::shared_ptr<TensorField> tf_ptr_;
-    RoadGenerator generator;
+    // empty definitions
+    virtual void render_impl(Renderer* ren) {};
+    virtual void render_2d_impl(Renderer* ren) {};
 
-    Renderer(RenderContext& ctx);
-
-    std::unordered_map<RoadType, RoadStyle> road_styles_ 
-        = default_road_styles;
-
-    void render_tensorfield() const;
-    void render_map_2d() const;
+public:
+    void render(Renderer* ren);
+    void render_2d(Renderer* ren);
 };
 
+
+class TensorFieldView : public Component {
+private:
+    TensorField* tf_;
+    FieldStyle style_;
+
+    void draw_eigen_line(Renderer* ren, const Vector2& vec, 
+        const Vector2& world_pos, Color col) const;
+public:
+    TensorFieldView(TensorField* tf_ptr);
+    void set_style(FieldStyle s);
+    void render_impl(Renderer* ren) override;
+};
+
+
+
+
+
+class MapView : public Component {
+private:
+    RoadGenerator* gen_;
+    const RoadStyle* styles_;
+
+    void draw_road_2d(const RoadHandle& handle,
+            const RoadStyle& style) const;
+public:
+    MapView(RoadGenerator* gen, const RoadStyle* styles);
+
+    void render_2d_impl(Renderer* ren) override;
+};
 
 #endif

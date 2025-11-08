@@ -2,9 +2,7 @@
 #define GENERATOR_H
 
 #include <queue>
-#include <vector>
 #include <random>
-#include <unordered_map>
 
 #include "../types.h"
 #include "tensor_field.h"
@@ -73,38 +71,34 @@ class RoadGenerator : public RoadStorage {
         static constexpr int kQuadTreeDepth = 10; // area of 3 pixels at 1920x1080
         static constexpr int kQuadTreeLeafCapacity = 10;
 
-
-        std::vector<RoadType> road_types_;
-        std::unordered_map<RoadType, GeneratorParameters> params_;
+        GeneratorParameters* params_;
         std::array<seed_queue, Eigenfield::count> seeds_;
         std::default_random_engine gen_;
         std::uniform_real_distribution<double> dist_;
 
-        std::shared_ptr<TensorField> field_;
+        TensorField* field_;
 
         int tangent_samples_ = 5;
         Box<double> viewport_;
 
         bool in_bounds(const DVector2& p) const;
 
-
         void add_candidate_seed(DVector2 pos, Eigenfield ef);
 
-        std::optional<DVector2> get_seed(RoadType road, Eigenfield ef);
-
+        std::optional<DVector2> get_seed(size_t road_type, Eigenfield ef);
 
         DVector2 get_eigenvector(const DVector2& x, const Eigenfield& ef) const;
         DVector2 integrate_rk4(const DVector2& x, const Eigenfield& ef, const double& dl) const;
 
-        void extend_road(Integration& res, const RoadType& road, const Eigenfield& ef) const;
+        void extend_road(Integration& res, const size_t& road_type, const Eigenfield& ef) const;
 
         std::list<DVector2>
-        generate_road(RoadType road, DVector2 seed_point, Eigenfield ef);
+        spawn_road(size_t road_type, DVector2 seed_point, Eigenfield ef);
 
-        int generate_all_roads(RoadType road);
+        int generate_roads(size_t road_type);
 
         
-        void simplify_streamline(RoadType road, std::list<DVector2>& points) const;
+        void simplify_streamline(size_t road_type, std::list<DVector2>& points) const;
         void douglas_peucker(
             const double& epsilon,
             const double& min_sep2,
@@ -114,27 +108,24 @@ class RoadGenerator : public RoadStorage {
         ) const;
 
 
-        void push_road(std::list<DVector2>& points, RoadType road, Eigenfield ef);
+        void push_road(std::list<DVector2>& points, size_t road_type, Eigenfield ef);
 
         DVector2 tangent(const NodeHandle& handle) const;
 
         std::optional<NodeHandle> joining_candidate(const NodeHandle& handle) const;
         std::list<DVector2> joining_streamline(double dl, DVector2 x0, DVector2 x1) const;
-        void connect_roads(RoadType road, Eigenfield ef);
+        void connect_roads(size_t road, Eigenfield ef);
 
 
     public:
         RoadGenerator(
-                std::shared_ptr<TensorField> field,
-                std::unordered_map<RoadType, GeneratorParameters>,
+                TensorField* field,
+                size_t road_type_count,
+                GeneratorParameters* params,
                 Box<double> viewport
             );
 
-        // getters
-        const std::vector<RoadType>& get_road_types() const;
-        const std::unordered_map<RoadType, GeneratorParameters>& get_parameters() const;
-
-
+        size_t road_type_count() const;
         void reset(Box<double> new_viewport);
         void clear();
         void generate();
