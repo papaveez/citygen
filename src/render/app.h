@@ -38,7 +38,6 @@ public:
 };
 
 
-
 class App  {
 private:
     Renderer ren_;

@@ -97,8 +97,10 @@ private:
 public:
     TensorField();
 
-    void add_grid(Grid&& grid);
-    void add_radial(Radial&& radial);
+    template <typename V>
+    void add_basis(V&& basis) {
+        basis_fields.push_back(std::move(basis));
+    }
 
     const DVector2& get_centre(size_t idx) const;
     const double& get_size(size_t idx) const;
@@ -112,8 +114,7 @@ public:
     void erase(size_t idx);
 
     template<typename V>
-    bool is(size_t idx) const
-    {
+    bool is(size_t idx) const {
         if (idx >= basis_fields.size()) return false;
 
         if (const V* ptr = std::get_if<V>(&basis_fields[idx])) {
@@ -124,8 +125,7 @@ public:
     }
 
     template<typename V, typename Func>
-    void visit_if(size_t idx, Func&& func)
-    {
+    void visit_if(size_t idx, Func&& func) {
         if (idx >= basis_fields.size())
             return;
 
@@ -135,8 +135,7 @@ public:
 
 
     template<typename V, typename Func>
-    void visit_if(size_t idx, Func&& func) const
-    {
+    void visit_if(size_t idx, Func&& func) const {
         if (idx >= basis_fields.size())
             return;
 

@@ -60,7 +60,7 @@ void App::run_generator() {
 
 void App::reset_tensorfield() {
     field_.clear();
-    field_.add_grid(Grid(0, {0,0}, 0, 0));
+    field_.add_basis(Grid(0, {0,0}, 0, 0));
 }
 
 

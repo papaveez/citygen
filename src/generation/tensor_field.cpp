@@ -209,16 +209,6 @@ Tensor Radial::get_tensor(const DVector2& pos) const {
 TensorField::TensorField() {}
 
 
-
-void TensorField::add_grid(Grid&& grid) {
-    basis_fields.push_back(std::move(grid));
-}
-
-
-void TensorField::add_radial(Radial&& radial) {
-    basis_fields.push_back(std::move(radial));
-}
-
 const DVector2& TensorField::get_centre(size_t idx) const {
     return std::visit([](const auto& f) -> const DVector2& {
             return f.get_centre();
