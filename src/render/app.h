@@ -27,7 +27,7 @@ class ToolBar : public Component {
 private:
     std::optional<int> selected_;
     ToolBarStyle style_;
-    Box<double> bbox_;
+    Box bbox_;
     std::vector<Tool>* tools_ = nullptr;
 
 public:

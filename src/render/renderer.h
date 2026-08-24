@@ -15,17 +15,17 @@ enum class RenderState {
 
 struct Renderer {
     int width, height;
-    Box<float> screen_dims = {Vector2{0, 0}, Vector2{(float)width, (float)height}};
+    Box screen_dims = {Vector2{0, 0}, Vector2{(float)width, (float)height}};
     const char* window_title;
     Camera2D camera = {0};
     RenderState state = RenderState::None;
     bool camera_locked = false;
-    DVector2 mouse_world_pos = {0.0, 0.0};
-    Box<double> viewport = Box(
+    Vector2 mouse_world_pos = {0.0, 0.0};
+    Box viewport = Box(
         {0,0},
-        DVector2{
-            static_cast<double>(width), 
-            static_cast<double>(height)
+        Vector2{
+            static_cast<float>(width), 
+            static_cast<float>(height)
         }
     );
 

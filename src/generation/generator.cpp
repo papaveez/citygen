@@ -4,14 +4,14 @@
 GeneratorParameters::GeneratorParameters(
         int max_seed_retries,
         int max_integration_iterations,
-        double d_sep,
-        double d_test,
-        double d_circle,
-        double dl,
-        double d_lookahead,
-        double theta_max,
-        double epsilon,
-        double node_sep
+        float d_sep,
+        float d_test,
+        float d_circle,
+        float dl,
+        float d_lookahead,
+        float theta_max,
+        float epsilon,
+        float node_sep
         ) :
     max_seed_retries(max_seed_retries),
     max_integration_iterations(max_integration_iterations),
@@ -33,26 +33,26 @@ GeneratorParameters::GeneratorParameters(
 
 //  SECTION: RoadGenerator
 
-bool RoadGenerator::in_bounds(const DVector2& p) const {
+bool RoadGenerator::in_bounds(const Vector2& p) const {
     return viewport_.contains(p);
 }
 
 
-void RoadGenerator::add_candidate_seed(DVector2 pos, Eigenfield ef) {
+void RoadGenerator::add_candidate_seed(Vector2 pos, Eigenfield ef) {
     seeds_[ef].push(pos);
 }
 
 
-std::optional<DVector2> 
+std::optional<Vector2> 
 RoadGenerator::get_seed(size_t road, Eigenfield ef) {
     seed_queue& candidate_queue = seeds_[ef];
 
     const GeneratorParameters& param = params_[road];
 
 
-    DVector2 seed;
+    Vector2 seed;
     while (!candidate_queue.empty()) {
-        DVector2 seed = candidate_queue.front();
+        Vector2 seed = candidate_queue.front();
         candidate_queue.pop();
         if (!has_nearby_point(seed, param.d_sep, ef)) {
             return seed;
@@ -61,7 +61,7 @@ RoadGenerator::get_seed(size_t road, Eigenfield ef) {
 
 
     for (int count=0; count<param.max_seed_retries; count++) {
-        seed = DVector2 {
+        seed = Vector2 {
             dist_(gen_)*viewport_.width()  + viewport_.min.x,
             dist_(gen_)*viewport_.height() + viewport_.min.y
         };
@@ -74,7 +74,7 @@ RoadGenerator::get_seed(size_t road, Eigenfield ef) {
     return {};
 }
 
-DVector2 RoadGenerator::get_eigenvector(const DVector2& x,
+Vector2 RoadGenerator::get_eigenvector(const Vector2& x,
     const Eigenfield& ef) const 
 {
     Tensor out = field_->sample(x);
@@ -86,14 +86,14 @@ DVector2 RoadGenerator::get_eigenvector(const DVector2& x,
     }
 }
 
-DVector2 RoadGenerator::integrate_rk4(const DVector2& x,
-    const Eigenfield& ef, const double& dl) const 
+Vector2 RoadGenerator::integrate_rk4(const Vector2& x,
+    const Eigenfield& ef, const float& dl) const 
 {
-    DVector2 dx = {dl, dl};
+    Vector2 dx = {dl, dl};
 
-    DVector2 k1 = get_eigenvector(x, ef);
-    DVector2 k2 = get_eigenvector(x + dx/2.0, ef);
-    DVector2 k4 = get_eigenvector(x + dx, ef);
+    Vector2 k1 = get_eigenvector(x, ef);
+    Vector2 k2 = get_eigenvector(x + dx/2.0, ef);
+    Vector2 k4 = get_eigenvector(x + dx, ef);
 
     return k1 + k2*4.0 + k4/6.0;
 }
@@ -110,7 +110,7 @@ void RoadGenerator::extend_road(
         return;
     };
 
-    DVector2 delta = integrate_rk4(
+    Vector2 delta = integrate_rk4(
         res.integration_front, 
         ef, 
         params_[road].dl
@@ -142,8 +142,8 @@ void RoadGenerator::extend_road(
 }
 
 
-std::list<DVector2>
-RoadGenerator::spawn_road(size_t road, DVector2 seed_point, Eigenfield ef) {
+std::list<Vector2>
+RoadGenerator::spawn_road(size_t road, Vector2 seed_point, Eigenfield ef) {
     Integration forward  (seed_point, false);
     Integration backward (seed_point, true );
 
@@ -173,8 +173,8 @@ RoadGenerator::spawn_road(size_t road, DVector2 seed_point, Eigenfield ef) {
         }
 
 
-        DVector2 ends_diff = forward.points.back() - backward.points.front();
-        double sep2 = dot_product(ends_diff, ends_diff);
+        Vector2 ends_diff = forward.points.back() - backward.points.front();
+        float sep2 = dot_product(ends_diff, ends_diff);
 
         if (points_diverged && sep2 < params_[road].d_circle2) {
             join = true;
@@ -190,7 +190,7 @@ RoadGenerator::spawn_road(size_t road, DVector2 seed_point, Eigenfield ef) {
         forward.points.push_back(backward.points.back()); // join up streamlines
     }
 
-    std::list<DVector2> result;
+    std::list<Vector2> result;
 
     result.splice(result.end(), backward.points);
     result.splice(result.end(), forward.points);
@@ -202,11 +202,11 @@ RoadGenerator::spawn_road(size_t road, DVector2 seed_point, Eigenfield ef) {
 int RoadGenerator::generate_roads(size_t road_type) {
     Eigenfield ef = Eigenfield::major();
 
-    std::optional<DVector2> seed = get_seed(road_type, ef);
+    std::optional<Vector2> seed = get_seed(road_type, ef);
     int k = 0;
     while (seed.has_value()) {
         std::cout << "Seed: " << seed.value() << std::endl;
-        std::list<DVector2> streamline = spawn_road(road_type, seed.value(), ef);
+        std::list<Vector2> streamline = spawn_road(road_type, seed.value(), ef);
 
         simplify_streamline(road_type, streamline);
 
@@ -229,15 +229,15 @@ int RoadGenerator::generate_roads(size_t road_type) {
 }
 
 
-void RoadGenerator::simplify_streamline(size_t road, std::list<DVector2>& points) const {
+void RoadGenerator::simplify_streamline(size_t road, std::list<Vector2>& points) const {
     assert(params_[road].epsilon > 0.0);
     douglas_peucker(params_[road].epsilon, params_[road].node_sep2, points, points.begin(), points.end());
 }
 
 
-void RoadGenerator::douglas_peucker(const double& epsilon, const double& min_sep2, 
-        std::list<DVector2>& points,
-        std::list<DVector2>::iterator begin, std::list<DVector2>::iterator end) const 
+void RoadGenerator::douglas_peucker(const float& epsilon, const float& min_sep2, 
+        std::list<Vector2>& points,
+        std::list<Vector2>::iterator begin, std::list<Vector2>::iterator end) const 
 {
     // must be 3> elements 
     int count = 0;
@@ -246,15 +246,15 @@ void RoadGenerator::douglas_peucker(const double& epsilon, const double& min_sep
 
     auto last_elem = std::prev(end);
 
-    const DVector2& first_pos = *begin;
-    const DVector2& last_pos  = *last_elem;
+    const Vector2& first_pos = *begin;
+    const Vector2& last_pos  = *last_elem;
 
-    double d_max = 0.0;
-    std::list<DVector2>::iterator index;
+    float d_max = 0.0;
+    std::list<Vector2>::iterator index;
 
 
     for (auto it=std::next(begin); it != last_elem; ++it) {
-        double d = perpendicular_distance(*it, first_pos, last_pos);
+        float d = perpendicular_distance(*it, first_pos, last_pos);
 
         if (d > d_max) {
             d_max = d;
@@ -270,8 +270,8 @@ void RoadGenerator::douglas_peucker(const double& epsilon, const double& min_sep
             auto next = std::next(it);
 
             auto prev = std::prev(it);
-            DVector2 diff = *it - *prev;
-            double dist2 = dot_product(diff, diff);
+            Vector2 diff = *it - *prev;
+            float dist2 = dot_product(diff, diff);
 
             if (dist2 < min_sep2) points.erase(it);
 
@@ -281,7 +281,7 @@ void RoadGenerator::douglas_peucker(const double& epsilon, const double& min_sep
 }
 
 
-void RoadGenerator::push_road(std::list<DVector2>& points, size_t road, Eigenfield ef) {
+void RoadGenerator::push_road(std::list<Vector2>& points, size_t road, Eigenfield ef) {
     if (points.front() != points.back()) {
         add_candidate_seed(points.front(), ef.opposite());
         add_candidate_seed(points.back(), ef.opposite());
@@ -291,7 +291,7 @@ void RoadGenerator::push_road(std::list<DVector2>& points, size_t road, Eigenfie
 }
 
 
-DVector2 RoadGenerator::tangent(const NodeHandle& handle) const {
+Vector2 RoadGenerator::tangent(const NodeHandle& handle) const {
     const Road& road = get_road(handle);
 
     int idx = handle.idx;
@@ -319,30 +319,30 @@ RoadGenerator::joining_candidate(const NodeHandle& handle) const {
         Eigenfield::major() | Eigenfield::minor()
     );
 
-    double theta_max = params_[road_handle.road_type].theta_max;
-    DVector2 pos = get_pos(handle);
-    DVector2 local_dir = tangent(handle);
+    float theta_max = params_[road_handle.road_type].theta_max;
+    Vector2 pos = get_pos(handle);
+    Vector2 local_dir = tangent(handle);
 
     bool is_endpoint = (handle.idx == road.end - 1 || handle.idx == road.begin);
 
     if (handle.idx == road.begin) local_dir = local_dir*-1.0;
 
-    double min_dist2 = std::numeric_limits<double>::infinity();
+    float min_dist2 = std::numeric_limits<float>::infinity();
     std::optional<NodeHandle> best_candidate;
 
     for (const NodeHandle& candidate : nearby) {
         if (candidate.road_handle == road_handle) continue;
 
-        DVector2 join_vector = get_pos(candidate) - pos;
+        Vector2 join_vector = get_pos(candidate) - pos;
 
         if (is_endpoint && dot_product(join_vector, local_dir) < 0)
             continue;
 
-        double dist2 = dot_product(join_vector, join_vector);
+        float dist2 = dot_product(join_vector, join_vector);
 
         if (dist2 > min_dist2) continue;
 
-        double leave_angle = std::abs(
+        float leave_angle = std::abs(
             vector_angle(local_dir, join_vector)
         );
 
@@ -356,18 +356,18 @@ RoadGenerator::joining_candidate(const NodeHandle& handle) const {
 }
 
 
-std::list<DVector2>
-RoadGenerator::joining_streamline(double dl, DVector2 x0, DVector2 x1) const {
-    DVector2 diff = (x1 - x0);
-    double dist = std::hypot(diff.x, diff.y);
+std::list<Vector2>
+RoadGenerator::joining_streamline(float dl, Vector2 x0, Vector2 x1) const {
+    Vector2 diff = (x1 - x0);
+    float dist = std::hypot(diff.x, diff.y);
 
     dl = std::min(dist/tangent_samples_, dl);
 
-    DVector2 inc = diff*dl/dist;
+    Vector2 inc = diff*dl/dist;
 
-    std::list<DVector2> out = {x0};
+    std::list<Vector2> out = {x0};
 
-    double dl2 = dl*dl;
+    float dl2 = dl*dl;
 
     while (dot_product(diff, diff) > dl2) {
         out.push_back(out.back() + inc);
@@ -388,7 +388,7 @@ void RoadGenerator::connect_roads(size_t road_type, Eigenfield ef) {
 
     std::uint32_t count = road_count(road_type, ef);
 
-    double dl = params_[road_type].node_sep;
+    float dl = params_[road_type].node_sep;
 
     for (std::uint32_t idx = 0; idx < count; ++idx) {
         road_handle.idx = idx;
@@ -401,7 +401,7 @@ void RoadGenerator::connect_roads(size_t road_type, Eigenfield ef) {
         std::optional<NodeHandle> last_join  = joining_candidate(last);
 
         if (first_join.has_value()) {
-            std::list<DVector2> s_join = joining_streamline(
+            std::list<Vector2> s_join = joining_streamline(
                 dl,
                 get_pos(first),
                 get_pos(first_join.value())
@@ -410,7 +410,7 @@ void RoadGenerator::connect_roads(size_t road_type, Eigenfield ef) {
             insert(s_join, road_type, ef, true);
         }
         if (last_join.has_value()) {
-            std::list<DVector2> s_join = joining_streamline(
+            std::list<Vector2> s_join = joining_streamline(
                 dl,
                 get_pos(last),
                 get_pos(last_join.value())
@@ -426,7 +426,7 @@ RoadGenerator::RoadGenerator(
     TensorField* field,
     size_t road_type_count,
     GeneratorParameters* parameters,
-    Box<double> viewport
+    Box viewport
 ) :
     viewport_(viewport),
     field_(field),
@@ -446,7 +446,7 @@ size_t RoadGenerator::road_type_count() const {
     return road_type_count_;
 }
 
-void RoadGenerator::reset(Box<double> new_viewport) {
+void RoadGenerator::reset(Box new_viewport) {
     viewport_ = new_viewport;
     clear();
 }

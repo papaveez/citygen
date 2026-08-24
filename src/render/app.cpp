@@ -4,7 +4,7 @@
 
 
 ToolBar::ToolBar(int window_height) :
-    bbox_({ {0,0}, {style_.width, (double) window_height} })
+    bbox_({ {0,0}, {style_.width, static_cast<float>(window_height)} })
 {}
 
 void ToolBar::set_style(ToolBarStyle s) {
@@ -73,7 +73,7 @@ void App::set_state(AppState s) {
 App::App(int w, int h, const char* window_title, GeneratorParameters* params, size_t road_type_count) :
     ren_(Renderer(w, h, window_title)),
     params_(params),
-    gen_(RoadGenerator(&field_, road_type_count, params_, Box<double>{{0,0},{1,1}})),
+    gen_(RoadGenerator(&field_, road_type_count, params_, Box{{0,0},{1,1}})),
     map_view(&gen_, default_styles),
     toolbar(ren_.height),
     field_view(&field_)

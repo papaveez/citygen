@@ -2,91 +2,93 @@
 
 #include <cstddef>
 #include <limits>
+#include <variant>
+#include <vector>
 
-#include "../types.h"
+#include "raylib.h"
 
-static constexpr double d_epsilon = std::numeric_limits<double>::epsilon();
+static constexpr float d_epsilon = std::numeric_limits<float>::epsilon();
 
 struct Tensor {
     // 2x2 symmetric, traceless matrix represented as
     // R * | cos(2θ)  sin(2θ) | --> | a  b |
     //     | sin(2θ) -cos(2θ) |     | _  _ |
-    double a;
-    double b;
-    double r;
-    double theta;
+    float a;
+    float b;
+    float r;
+    float theta;
 
     static Tensor degenerate();
-    static Tensor from_a_b(const double& a, const double& b);
-    static Tensor from_r_theta(const double& r, const double& theta);
-    static Tensor from_xy(const DVector2& xy);
+    static Tensor from_a_b(float a, float b);
+    static Tensor from_r_theta(float r, float theta);
+    static Tensor from_xy(const Vector2& xy);
 
     void set_r_theta();
 
     bool is_degenerate() const;
-    DVector2 get_major_eigenvector() const;
-    DVector2 get_minor_eigenvector() const;
+    Vector2 get_major_eigenvector() const;
+    Vector2 get_minor_eigenvector() const;
 
-    Tensor rotate(const double& angle) const;
+    Tensor rotate(float angle) const;
 
     Tensor operator+(const Tensor& other) const;
 
     // right scalar mult
-    Tensor operator*(const double& right) const;
+    Tensor operator*(float right) const;
 
 
     // left scalar mult
-    friend Tensor operator*(const double& left, const Tensor& right);
+    friend Tensor operator*(float left, const Tensor& right);
 };
 
 
 class BasisField {
     protected:
-        DVector2 centre_;
-        double size_;
-        double decay_;
+        Vector2 centre_;
+        float size_;
+        float decay_;
 
-        virtual Tensor get_tensor(const DVector2& pos) const;
-        double get_tensor_weight(const DVector2& pos) const;
+        virtual Tensor get_tensor(const Vector2& pos) const;
+        float get_tensor_weight(const Vector2& pos) const;
 
     public:
-        BasisField(DVector2 centre);
-        BasisField(DVector2 centre, double size, double decay);
+        BasisField(Vector2 centre);
+        BasisField(Vector2 centre, float size, float decay);
         virtual ~BasisField() = default;
 
-        const DVector2& get_centre() const;
-        const double& get_size() const;
-        const double& get_decay() const;
+        const Vector2& get_centre() const;
+        const float& get_size() const;
+        const float& get_decay() const;
 
-        void set_centre(DVector2 centre);
-        void set_size(double size);
-        void set_decay(double decay);
+        void set_centre(Vector2 centre);
+        void set_size(float size);
+        void set_decay(float decay);
 
 
-        Tensor get_weighted_tensor(const DVector2& pos) const;
+        Tensor get_weighted_tensor(const Vector2& pos) const;
 };
 
 
 class Grid : public BasisField {
     private:
-        double theta;
+        float theta;
 
 
     public:
-        Grid(double theta, DVector2 centre);
-        Grid(double theta, DVector2 centre, double size, double decay);
+        Grid(float theta, Vector2 centre);
+        Grid(float theta, Vector2 centre, float size, float decay);
 
-        Tensor get_tensor(const DVector2& pos) const override;
-        void set_theta(double _theta);
+        Tensor get_tensor(const Vector2& pos) const override;
+        void set_theta(float _theta);
 };
 
 
 class Radial : public BasisField {
     public:
-        Radial(DVector2 centre);
-        Radial(DVector2 centre, double size, double decay);
+        Radial(Vector2 centre);
+        Radial(Vector2 centre, float size, float decay);
 
-        Tensor get_tensor(const DVector2& pos) const override;
+        Tensor get_tensor(const Vector2& pos) const override;
 };
 
 
@@ -102,14 +104,14 @@ public:
         basis_fields.push_back(std::move(basis));
     }
 
-    const DVector2& get_centre(size_t idx) const;
-    const double& get_size(size_t idx) const;
-    const double& get_decay(size_t idx) const;
+    const Vector2& get_centre(size_t idx) const;
+    const float& get_size(size_t idx) const;
+    const float& get_decay(size_t idx) const;
 
 
-    void set_centre(size_t idx, DVector2 centre);
-    void set_size(size_t idx, double size);
-    void set_decay(size_t idx, double decay);
+    void set_centre(size_t idx, Vector2 centre);
+    void set_size(size_t idx, float size);
+    void set_decay(size_t idx, float decay);
 
     void erase(size_t idx);
 
@@ -143,7 +145,7 @@ public:
             std::invoke(std::forward<Func>(func), *ptr);
     }
 
-    Tensor sample(const DVector2& pos) const;
+    Tensor sample(const Vector2& pos) const;
     size_t size() const;
     void clear();
 };

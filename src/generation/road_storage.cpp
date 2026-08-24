@@ -2,11 +2,11 @@
 
 
 std::array<std::pair<ef_mask, std::list<NodeHandle>>, 4> 
-RoadStorage::partition(const Box<double>& bbox, std::list<NodeHandle>& s) {
-    DVector2 mid = middle(bbox.min, bbox.max);
+RoadStorage::partition(const Box& bbox, std::list<NodeHandle>& s) {
+    Vector2 mid = middle(bbox.min, bbox.max);
 
     auto quadrant_id = [&mid, this](const NodeHandle& h) {
-        const DVector2& pos = get_pos(h);
+        const Vector2& pos = get_pos(h);
         return (pos.x > mid.x) + ((pos.y > mid.y)<<1);
     };
 
@@ -69,12 +69,12 @@ void RoadStorage::insert_rec(const int& depth, const qnode_id& head_ptr,
 
     qnodes_[head_ptr].eigenfields |= eigenfields;
 
-    Box<double> bbox = qnodes_[head_ptr].bbox;
+    Box bbox = qnodes_[head_ptr].bbox;
     auto parts = partition(bbox, list);
 
     int next_depth = depth+1;
 
-    std::array<Box<double>, 4> quadrants = bbox.quadrants();
+    std::array<Box, 4> quadrants = bbox.quadrants();
 
     for (int q=0;q<4;++q) {
         auto& [sub_dirs, sublist] = parts[q];
@@ -120,7 +120,7 @@ RoadStorage::in_circle_rec(const qnode_id& head_ptr,
         for (const NodeHandle& handle : head.data) {
             if (!(get_eigenfields(handle) & query.eigenfields)) continue;
 
-            DVector2 diff = query.centre - get_pos(handle);
+            Vector2 diff = query.centre - get_pos(handle);
             if (dot_product(diff, diff) > query.radius2) continue;
 
             if (query.gather) query.harvest.push_back(handle);
@@ -214,7 +214,7 @@ RoadStorage::gather_data_rec(const qnode_id& head_ptr, BBoxQuery& query) const {
 
 
 RoadStorage::RoadStorage(
-    Box<double> viewport,
+    Box viewport,
     int depth,
     int leaf_capacity,
     size_t road_type_count
@@ -229,7 +229,7 @@ RoadStorage::RoadStorage(
 }
 
 
-const DVector2& RoadStorage::get_pos(const NodeHandle& h) const {
+const Vector2& RoadStorage::get_pos(const NodeHandle& h) const {
     return nodes_[h.idx];
 }
 
@@ -249,7 +249,7 @@ const Road& RoadStorage::get_road(const NodeHandle& h) const {
 }
 
 
-void RoadStorage::reset_storage(Box<double> new_viewport) {
+void RoadStorage::reset_storage(Box new_viewport) {
     viewport_ = new_viewport;
     root_ = 0;
     qnodes_.clear();
@@ -266,7 +266,7 @@ void RoadStorage::reset_storage(Box<double> new_viewport) {
 }
 
 
-void RoadStorage::insert(const std::list<DVector2>& points,
+void RoadStorage::insert(const std::list<Vector2>& points,
     size_t road_type, Eigenfield eigenfield, bool is_join) {
     if (points.size() == 0) return;
 
@@ -324,14 +324,14 @@ std::uint32_t RoadStorage::road_count(size_t road_type, Eigenfield eigenfield) c
 
 
 bool 
-RoadStorage::has_nearby_point(DVector2 centre, double radius, ef_mask eigenfields) const {
+RoadStorage::has_nearby_point(Vector2 centre, float radius, ef_mask eigenfields) const {
     CircleQuery query(eigenfields, centre, radius, false);
     return in_circle_rec(root_, query);
 }
 
 
 std::list<NodeHandle>
-RoadStorage::nearby_points(DVector2 centre, double radius, ef_mask eigenfields) const {
+RoadStorage::nearby_points(Vector2 centre, float radius, ef_mask eigenfields) const {
     CircleQuery query(eigenfields, centre, radius, true);
     in_circle_rec(root_, query);
     return query.harvest;

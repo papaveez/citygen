@@ -2,6 +2,8 @@
 #include <cstddef>
 
 
+#include "raymath.h"
+
 // ****** Tensor ******
 
 Tensor Tensor::degenerate() {
@@ -9,7 +11,7 @@ Tensor Tensor::degenerate() {
 }
 
 
-Tensor Tensor::from_a_b(const double& a, const double& b) {
+Tensor Tensor::from_a_b(float a, float b) {
     Tensor out = Tensor {a, b};
     out.set_r_theta();
     return out;
@@ -27,7 +29,7 @@ void Tensor::set_r_theta() {
 }
 
 
-Tensor Tensor::from_r_theta(const double& r, const double& theta) {
+Tensor Tensor::from_r_theta(float r, float theta) {
     return Tensor {
         r*std::cos(2*theta),
         r*std::sin(2*theta),
@@ -37,7 +39,7 @@ Tensor Tensor::from_r_theta(const double& r, const double& theta) {
 }
 
 
-Tensor Tensor::from_xy(const DVector2& xy) {
+Tensor Tensor::from_xy(const Vector2& xy) {
     const double& x = xy.x;
     const double& y = xy.y;
 
@@ -51,7 +53,7 @@ bool Tensor::is_degenerate() const {
 
 
 
-DVector2 Tensor::get_major_eigenvector() const {
+Vector2 Tensor::get_major_eigenvector() const {
     if (is_degenerate()) return {0.0, 0.0};
 
     return {
@@ -60,16 +62,16 @@ DVector2 Tensor::get_major_eigenvector() const {
     };
 }
 
-DVector2 Tensor::get_minor_eigenvector() const {
+Vector2 Tensor::get_minor_eigenvector() const {
     if (is_degenerate()) return {0.0, 0.0};
     return {
         std::sin(theta),
-        std::cos(theta)*-1.0
+        std::cos(theta)*-1.0f
     };
 }
 
 
-Tensor Tensor::rotate(const double& angle) const {
+Tensor Tensor::rotate(float angle) const {
     return Tensor::from_r_theta(
         r,
         std::fmodf(theta + angle, 2.0f*M_PI)
@@ -82,67 +84,67 @@ Tensor Tensor::operator+(const Tensor& other) const {
 }
 
 
-Tensor Tensor::operator*(const double& right) const {
+Tensor Tensor::operator*(float right) const {
     return Tensor(right*a, right*b);
 }
 
 
-Tensor operator*(double left, const Tensor& right) {
+Tensor operator*(float left, const Tensor& right) {
     return Tensor(left*right.a, left*right.b);
 }
 
 
 // ****** BasisField ******
 
-BasisField::BasisField(DVector2 centre) 
+BasisField::BasisField(Vector2 centre) 
     : centre_(centre), size_(0), decay_(0) {}
 
 
-BasisField::BasisField(DVector2 centre, double size, double decay) 
+BasisField::BasisField(Vector2 centre, float size, float decay) 
     : centre_(centre), size_(size), decay_(decay) {}
 
 
-const DVector2& BasisField::get_centre() const {
+const Vector2& BasisField::get_centre() const {
     return centre_;
 }
 
 
-const double& BasisField::get_size() const {
+const float& BasisField::get_size() const {
     return size_;
 }
 
 
-const double& BasisField::get_decay() const {
+const float& BasisField::get_decay() const {
     return decay_;
 }
 
 
-void BasisField::set_centre(DVector2 centre) {
+void BasisField::set_centre(Vector2 centre) {
     centre_ = centre;
 }
 
 
-void BasisField::set_size(double size) {
+void BasisField::set_size(float size) {
     size_ = size;
 }
 
 
-void BasisField::set_decay(double decay) {
+void BasisField::set_decay(float decay) {
     decay_ = decay;
 }
 
 
-Tensor BasisField::get_tensor(const DVector2& pos) const {
+Tensor BasisField::get_tensor(const Vector2& pos) const {
     return Tensor::degenerate();
 } 
 
 
-double BasisField::get_tensor_weight(const DVector2& pos) const {
+float BasisField::get_tensor_weight(const Vector2& pos) const {
     if (size_ == 0) {
         return 1;
     }
 
-    DVector2 from_centre = pos - centre_;
+    Vector2 from_centre = pos - centre_;
     double norm_dist_to_centre =
         std::hypot(from_centre.x, from_centre.y) / size_;
     
@@ -163,26 +165,26 @@ double BasisField::get_tensor_weight(const DVector2& pos) const {
 }
 
 
-Tensor BasisField::get_weighted_tensor(const DVector2& pos) const {
+Tensor BasisField::get_weighted_tensor(const Vector2& pos) const {
     return get_tensor(pos)*get_tensor_weight(pos);
 }
 
 
 
 // ****** BasisField : Grid ******
-Grid::Grid(double _theta, DVector2 _centre) 
+Grid::Grid(float _theta, Vector2 _centre) 
     : BasisField(_centre), theta(_theta) {}
 
-Grid::Grid(double _theta, DVector2 _centre, double _size, double _decay) 
+Grid::Grid(float _theta, Vector2 _centre, float _size, float _decay) 
     : BasisField(_centre, _size, _decay), theta(_theta) {}
 
 
-void Grid::set_theta(double _theta) {
+void Grid::set_theta(float _theta) {
     theta = _theta;
 }
 
 
-Tensor Grid::get_tensor(const DVector2& pos) const {
+Tensor Grid::get_tensor(const Vector2& pos) const {
     return Tensor::from_r_theta(1, theta);
 }
 
@@ -190,15 +192,15 @@ Tensor Grid::get_tensor(const DVector2& pos) const {
 
 // ****** BasisField : Radial ******
 
-Radial::Radial(DVector2 _centre) 
+Radial::Radial(Vector2 _centre) 
     : BasisField(_centre) {}
 
-Radial::Radial(DVector2 _centre, double _size, double _decay) 
+Radial::Radial(Vector2 _centre, float _size, float _decay) 
     : BasisField(_centre, _size, _decay) {}
 
 
 
-Tensor Radial::get_tensor(const DVector2& pos) const {
+Tensor Radial::get_tensor(const Vector2& pos) const {
     return Tensor::from_xy(pos - centre_);
 }
 
@@ -209,24 +211,24 @@ Tensor Radial::get_tensor(const DVector2& pos) const {
 TensorField::TensorField() {}
 
 
-const DVector2& TensorField::get_centre(size_t idx) const {
-    return std::visit([](const auto& f) -> const DVector2& {
+const Vector2& TensorField::get_centre(size_t idx) const {
+    return std::visit([](const auto& f) -> const Vector2& {
             return f.get_centre();
         },
         basis_fields[idx]
     );
 }
 
-const double& TensorField::get_size(size_t idx) const {
-    return std::visit([](const auto& f) -> const double& {
+const float& TensorField::get_size(size_t idx) const {
+    return std::visit([](const auto& f) -> const float& {
             return f.get_size();
         },
         basis_fields[idx]
     );
 }
 
-const double& TensorField::get_decay(size_t idx) const {
-    return std::visit([](const auto& f) -> const double& {
+const float& TensorField::get_decay(size_t idx) const {
+    return std::visit([](const auto& f) -> const float& {
             return f.get_decay();
         },
         basis_fields[idx]
@@ -234,7 +236,7 @@ const double& TensorField::get_decay(size_t idx) const {
 }
 
 
-void TensorField::set_centre(size_t idx, DVector2 centre) {
+void TensorField::set_centre(size_t idx, Vector2 centre) {
     std::visit([&centre](auto& f) {
             f.set_centre(centre);
         },
@@ -243,7 +245,7 @@ void TensorField::set_centre(size_t idx, DVector2 centre) {
 }
 
 
-void TensorField::set_size(size_t idx, double size) {
+void TensorField::set_size(size_t idx, float size) {
     std::visit([&size](auto& f) {
             f.set_size(size);
         }, 
@@ -252,7 +254,7 @@ void TensorField::set_size(size_t idx, double size) {
 }
 
 
-void TensorField::set_decay(size_t idx, double decay) {
+void TensorField::set_decay(size_t idx, float decay) {
     std::visit([&decay](auto& f) {
             f.set_decay(decay);
         },
@@ -266,7 +268,7 @@ void TensorField::erase(size_t idx) {
 }
 
 
-Tensor TensorField::sample(const DVector2& pos) const {
+Tensor TensorField::sample(const Vector2& pos) const {
     Tensor total;
 
     for (auto& x : basis_fields) {

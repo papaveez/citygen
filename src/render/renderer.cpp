@@ -57,8 +57,8 @@ void Renderer::main_loop() {
     );
 
     viewport = Box(
-        DVector2(GetScreenToWorld2D(screen_dims.min, camera)),
-        DVector2(GetScreenToWorld2D(screen_dims.max, camera))
+        Vector2(GetScreenToWorld2D(screen_dims.min, camera)),
+        Vector2(GetScreenToWorld2D(screen_dims.max, camera))
     );
 
 

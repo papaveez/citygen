@@ -8,7 +8,7 @@
 #include <list>
 #include <vector>
 
-#include "../types.h"
+#include "../util.h"
 
 
 using qnode_id = std::uint32_t;                
@@ -94,11 +94,11 @@ struct NodeHandle {
 };
 
 struct QuadNode {
-    Box<double> bbox;
+    Box bbox;
     std::list<NodeHandle> data;
     qnode_id children[4] = {NullQNode, NullQNode, NullQNode, NullQNode};
     ef_mask eigenfields;
-    QuadNode(Box<double> bounding_box, ef_mask eigenfields) :
+    QuadNode(Box bounding_box, ef_mask eigenfields) :
         bbox(bounding_box),
         eigenfields(eigenfields)
     {}
@@ -111,24 +111,24 @@ private:
     struct BBoxQuery {
         ef_mask eigenfields;
         bool gather;
-        Box<double> inner_bbox;
+        Box inner_bbox;
         std::list<NodeHandle> harvest;
     };
 
     struct CircleQuery : BBoxQuery {
-        DVector2 centre;
-        double radius;
-        double radius2;
-        Box<double> outer_bbox;
-        CircleQuery(ef_mask eigenfields, DVector2 c, double r, bool g) : 
+        Vector2 centre;
+        float radius;
+        float radius2;
+        Box outer_bbox;
+        CircleQuery(ef_mask eigenfields, Vector2 c, float r, bool g) : 
             BBoxQuery({eigenfields, g}),
             centre(c),
             radius(r) 
         {
             radius2 = radius*radius;
 
-            DVector2 circumscribed_diag = {radius, radius};
-            DVector2 inscribed_diag = circumscribed_diag/M_SQRT2;
+            Vector2 circumscribed_diag = {radius, radius};
+            Vector2 inscribed_diag = circumscribed_diag/M_SQRT2;
 
             outer_bbox = Box (
                 centre - circumscribed_diag,
@@ -144,12 +144,12 @@ private:
     };
 
     // node storage
-    std::vector<DVector2> nodes_;
+    std::vector<Vector2> nodes_;
     std::vector<Vector2> fnodes_; // quick conversion to float for rendering
     std::vector<std::array<std::vector<Road>, Eigenfield::count>> roads_;
 
     // quadtree
-    Box<double> viewport_;
+    Box viewport_;
 
 #ifdef STORAGE_TEST
 public:
@@ -162,7 +162,7 @@ public:
 
 
     std::array<std::pair<ef_mask, std::list<NodeHandle>>, 4> 
-        partition(const Box<double>& bbox, std::list<NodeHandle>& s);
+        partition(const Box& bbox, std::list<NodeHandle>& s);
 
     bool is_leaf(const qnode_id& id) const;
 
@@ -197,36 +197,36 @@ public:
 protected:
     size_t road_type_count_;
     RoadStorage(
-        Box<double> viewport,
+        Box viewport,
         int depth,
         int leaf_capacity,
         size_t road_type_count
     );
 
-    const DVector2& get_pos(const NodeHandle& h) const;
+    const Vector2& get_pos(const NodeHandle& h) const;
     ef_mask get_eigenfields(const NodeHandle& h) const;
 
     const Road& get_road(const RoadHandle& h) const;
     const Road& get_road(const NodeHandle& h) const;
 
-    void reset_storage(Box<double> new_viewport);
+    void reset_storage(Box new_viewport);
 
     void insert(
-        const std::list<DVector2>& points,
+        const std::list<Vector2>& points,
         size_t road_type,
         Eigenfield eigenfield,
         bool is_join = false
     );
     
     bool has_nearby_point(
-        DVector2 centre,
-        double radius,
+        Vector2 centre,
+        float radius,
         ef_mask eigenfields
     ) const;
 
     std::list<NodeHandle> nearby_points(
-        DVector2 centre,
-        double radius,
+        Vector2 centre,
+        float radius,
         ef_mask eigenfields
     ) const;
 
