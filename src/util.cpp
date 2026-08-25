@@ -99,13 +99,6 @@ Box Box::get_quadrant(Quadrant q) {
     }
 }
 
-Quadrant Box::which_quadrant(Vector2 pos) {
-    Vector2 mid = middle(min, max);
-
-    for (Quadrant q : {TopLeft, TopRight, BottomLeft, BottomRight}) {
-        if (get_quadrant(q).contains(pos)) return q;
-    }
-}
 
 bool Box::operator==(const Box& other) const {
     return other.min == min && other.max == max;

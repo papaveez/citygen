@@ -47,7 +47,6 @@ struct Box {
     // Given in TL, TR, BL, BR order
     std::array<Box, 4> quadrants() const;
     Box get_quadrant(Quadrant q);
-    Quadrant which_quadrant(Vector2 pos);
 
     bool operator==(const Box& other) const;
 
