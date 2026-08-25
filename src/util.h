@@ -45,7 +45,7 @@ struct Box {
 
     bool is_empty() const {
         return min.x >= max.x
-            && min.y >= max.y;
+            || min.y >= max.y;
     }
 
 
