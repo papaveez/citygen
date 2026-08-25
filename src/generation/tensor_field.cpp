@@ -269,7 +269,7 @@ void TensorField::erase(size_t idx) {
 
 
 Tensor TensorField::sample(const Vector2& pos) const {
-    Tensor total;
+    Tensor total = Tensor::degenerate();
 
     for (auto& x : basis_fields) {
         std::visit([&total, &pos](const auto& f) {
