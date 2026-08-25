@@ -256,7 +256,6 @@ void RoadStorage::reset_storage(Box new_viewport) {
     qnodes_.emplace_back(new_viewport, 0);
 
     nodes_.clear();
-    fnodes_.clear();
 
     for (int i=0; i< road_type_count_; ++i) {
         for (int j=0; j < Eigenfield::count; ++j) {
@@ -292,7 +291,6 @@ void RoadStorage::insert(const std::list<Vector2>& points,
         assert(idx != -1);
 
         nodes_.push_back(pt);
-        fnodes_.push_back(pt);
         node_handles.push_back({
             idx,
             new_road_handle
@@ -313,7 +311,7 @@ RoadStorage::get_road_points(const RoadHandle& road_handle) const {
 
     return {
         road.end - road.begin,
-        fnodes_.data() + road.begin
+        nodes_.data() + road.begin
     };
 }
 

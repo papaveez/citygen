@@ -145,7 +145,6 @@ private:
 
     // node storage
     std::vector<Vector2> nodes_;
-    std::vector<Vector2> fnodes_; // quick conversion to float for rendering
     std::vector<std::array<std::vector<Road>, Eigenfield::count>> roads_;
 
     // quadtree
